@@ -10,13 +10,23 @@ android {
         applicationId "com.stellardrift.game"
         minSdk 21
         targetSdk 34
-        versionCode 1
-        versionName "1.0"
+        versionCode 2
+        versionName "2.0"
+    }
+
+    signingConfigs {
+        release {
+            storeFile file("../stellar-drift.jks")
+            storePassword System.getenv("KEYSTORE_PASSWORD") ?: "StellarDrift2024"
+            keyAlias System.getenv("KEY_ALIAS") ?: "stellardrift"
+            keyPassword System.getenv("KEY_PASSWORD") ?: "StellarDrift2024"
+        }
     }
 
     buildTypes {
         release {
             minifyEnabled false
+            signingConfig signingConfigs.release
         }
         debug {
             applicationIdSuffix ".debug"

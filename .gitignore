@@ -1,0 +1,6 @@
+*.jks
+keystore_base64.txt
+*.apk
+.gradle/
+build/
+local.properties
