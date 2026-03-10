@@ -11,7 +11,7 @@ import com.stellardrift.game.util.Constants;
 
 public class Player {
 
-    private float x, y, velocityX, size, maxSpeed;
+    private float x, y, size;
     private int screenW, screenH;
     private float glowPulse, engineFlicker;
 
@@ -39,9 +39,7 @@ public class Player {
     public Player(int sw, int sh) {
         screenW = sw; screenH = sh;
         size = sw * Constants.PLAYER_SIZE_RATIO;
-        maxSpeed = sw * 0.018f;
         x = sw / 2f; y = sh * 0.82f;
-        velocityX = 0;
 
         trailX = new float[TRAIL_LEN];
         trailY = new float[TRAIL_LEN];
@@ -57,58 +55,46 @@ public class Player {
     private void initPaints() {
         shipPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
         shipPaint.setStyle(Paint.Style.FILL);
-
         outlinePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
         outlinePaint.setColor(CYAN); outlinePaint.setStyle(Paint.Style.STROKE);
         outlinePaint.setStrokeWidth(1.5f); outlinePaint.setAlpha(180);
-
         glowPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
         glowPaint.setColor(CYAN); glowPaint.setStyle(Paint.Style.FILL);
-
         enginePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
         enginePaint.setStyle(Paint.Style.FILL);
-
         engineCorePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
         engineCorePaint.setColor(YELLOW); engineCorePaint.setStyle(Paint.Style.FILL);
-
         trailPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
         trailPaint.setColor(CYAN); trailPaint.setStyle(Paint.Style.FILL);
-
         cockpitPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
         cockpitPaint.setColor(Color.WHITE); cockpitPaint.setStyle(Paint.Style.FILL);
-
         wingPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
         wingPaint.setColor(PURPLE); wingPaint.setStyle(Paint.Style.FILL);
         wingPaint.setAlpha(140);
-
         stripePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
         stripePaint.setColor(CYAN); stripePaint.setStrokeCap(Paint.Cap.ROUND);
         stripePaint.setStyle(Paint.Style.STROKE);
-
         shieldPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
         shieldPaint.setColor(CYAN); shieldPaint.setStyle(Paint.Style.STROKE);
         shieldPaint.setStrokeWidth(2.5f);
     }
 
     public void update(float touchX, boolean touching) {
+        // Parmağı doğrudan takip et — çok daha kolay kontrol
         if (touching && touchX >= 0) {
-            float dx = touchX - x;
-            float tv = Math.max(-maxSpeed, Math.min(maxSpeed, dx * Constants.PLAYER_SPEED_FACTOR));
-            velocityX += (tv - velocityX) * 0.12f;
-        } else {
-            velocityX *= 0.92f;
+            float target = Math.max(size, Math.min(screenW - size, touchX));
+            x += (target - x) * Constants.PLAYER_FOLLOW_SPEED;
         }
-        x += velocityX;
-        x = Math.max(size, Math.min(screenW - size, x));
 
         trailIdx = (trailIdx + 1) % TRAIL_LEN;
         trailX[trailIdx] = x; trailY[trailIdx] = y;
-
         glowPulse += 0.06f;
         engineFlicker = 0.7f + (float)(Math.random() * 0.3);
 
-        if (shielded) { shieldTimer--; shieldPulse += 0.15f;
-            if (shieldTimer <= 0) shielded = false; }
+        if (shielded) {
+            shieldTimer--; shieldPulse += 0.15f;
+            if (shieldTimer <= 0) shielded = false;
+        }
     }
 
     public void render(Canvas c) {
@@ -148,7 +134,6 @@ public class Player {
         flamePath.lineTo(fx + w, fy); flamePath.close();
         enginePaint.setColor(ORANGE); enginePaint.setAlpha((int)(200 * engineFlicker));
         c.drawPath(flamePath, enginePaint);
-
         flameCore.reset();
         flameCore.moveTo(fx - w*0.45f, fy); flameCore.lineTo(fx, fy + l*0.55f);
         flameCore.lineTo(fx + w*0.45f, fy); flameCore.close();
@@ -186,17 +171,14 @@ public class Player {
         float s = size;
         stripePaint.setAlpha(120); stripePaint.setStrokeWidth(s * 0.05f);
         c.drawLine(x, y - s*0.9f, x, y + s*0.15f, stripePaint);
-
         cockpitPaint.setAlpha(210);
         cockpitRect.set(x - s*0.07f, y - s*0.75f, x + s*0.07f, y - s*0.3f);
         c.drawOval(cockpitRect, cockpitPaint);
-
         wingL.reset();
         wingL.moveTo(x - s*0.32f, y - s*0.05f);
         wingL.lineTo(x - s*0.7f, y + s*0.35f);
         wingL.lineTo(x - s*0.38f, y + s*0.18f); wingL.close();
         c.drawPath(wingL, wingPaint);
-
         wingR.reset();
         wingR.moveTo(x + s*0.32f, y - s*0.05f);
         wingR.lineTo(x + s*0.7f, y + s*0.35f);
@@ -229,7 +211,7 @@ public class Player {
     }
 
     public void reset() {
-        x = screenW / 2f; velocityX = 0;
+        x = screenW / 2f;
         shielded = false; shieldTimer = 0;
         for (int i = 0; i < TRAIL_LEN; i++) { trailX[i] = x; trailY[i] = y; }
     }

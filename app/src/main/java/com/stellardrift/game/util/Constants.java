@@ -16,7 +16,7 @@ public final class Constants {
     public static final int[] DIFF_COLORS = {0xFF00E676, 0xFFFFD740, 0xFFFF1744};
 
     public static final float PLAYER_SIZE_RATIO = 0.07f;
-    public static final float PLAYER_SPEED_FACTOR = 0.1f;
+    public static final float PLAYER_FOLLOW_SPEED = 0.25f;
 
     public static final float ASTEROID_MIN_SPEED = 3f;
     public static final float ASTEROID_MAX_SPEED = 8f;
@@ -53,6 +53,34 @@ public final class Constants {
     public static final String KEY_DIFFICULTY = "difficulty";
     public static final String KEY_VIBRATION = "vibration";
     public static final String KEY_SOUND = "sound";
+
+    // Combo
+    public static final int COMBO_TIMEOUT = 120;
+    public static final float COMBO_MULTIPLIER = 0.2f;
+
+    // Near-miss
+    public static final int NEAR_MISS_BONUS = 25;
+    public static final float NEAR_MISS_RANGE = 1.8f;
+
+    // Warm-up
+    public static final int WARMUP_FRAMES = 180;
+
+    // Power-ups
+    public static final int POWERUP_MAGNET = 0;
+    public static final int POWERUP_SLOWMO = 1;
+    public static final int POWERUP_DOUBLE = 2;
+    public static final int POWERUP_SHIELD = 3;
+    public static final int POWERUP_DURATION = 300;
+    public static final int POWERUP_SPAWN_INTERVAL = 600;
+    public static final float MAGNET_RANGE = 0.3f;
+    public static final float SLOWMO_FACTOR = 0.5f;
+
+    // Score popup
+    public static final int POPUP_LIFETIME = 40;
+
+    // Screen shake
+    public static final float SHAKE_INTENSITY = 12f;
+    public static final float SHAKE_DECAY = 0.88f;
 
     private Constants() {}
 }
