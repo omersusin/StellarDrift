@@ -17,9 +17,9 @@ android {
     signingConfigs {
         release {
             storeFile file("../stellar-drift.jks")
-            storePassword System.getenv("KEYSTORE_PASSWORD") ?: "StellarDrift2024"
+            storePassword System.getenv("KEYSTORE_PASSWORD") ?: "Stellar2024"
             keyAlias System.getenv("KEY_ALIAS") ?: "stellardrift"
-            keyPassword System.getenv("KEY_PASSWORD") ?: "StellarDrift2024"
+            keyPassword System.getenv("KEY_PASSWORD") ?: "Stellar2024"
         }
     }
 

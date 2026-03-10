@@ -35,10 +35,8 @@ jobs:
         run: chmod +x gradlew
 
       - name: Decode Keystore
-        env:
-          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
         run: |
-          echo "$KEYSTORE_BASE64" | base64 -d > stellar-drift.jks
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > stellar-drift.jks
 
       - name: Build Debug APK
         run: ./gradlew assembleDebug
@@ -52,20 +50,20 @@ jobs:
 
       - name: Rename APKs
         run: |
-          mv app/build/outputs/apk/debug/*.apk app/build/outputs/apk/debug/StellarDrift-v2.0-debug.apk
-          mv app/build/outputs/apk/release/*.apk app/build/outputs/apk/release/StellarDrift-v2.0-release.apk
+          mv app/build/outputs/apk/debug/*.apk app/build/outputs/apk/debug/StellarDrift-v2.0-debug.apk || true
+          mv app/build/outputs/apk/release/*.apk app/build/outputs/apk/release/StellarDrift-v2.0-release.apk || true
 
       - name: Upload Debug APK
         uses: actions/upload-artifact@v4
         with:
-          name: StellarDrift-v2.0-debug
+          name: StellarDrift-debug
           path: app/build/outputs/apk/debug/StellarDrift-v2.0-debug.apk
           retention-days: 30
 
       - name: Upload Release APK
         uses: actions/upload-artifact@v4
         with:
-          name: StellarDrift-v2.0-release
+          name: StellarDrift-release
           path: app/build/outputs/apk/release/StellarDrift-v2.0-release.apk
           retention-days: 30
 
@@ -76,28 +74,25 @@ jobs:
           name: "Stellar Drift ${{ github.ref_name }}"
           body: |
             ## 🚀 Stellar Drift ${{ github.ref_name }}
-            
+
             **An endless space survival game — made entirely by AI.**
-            
-            ### ✨ What's New in v2.0
-            - 🕹️ Virtual joystick control
-            - 🚀 Free movement in all directions
-            - ⚡ Game speed setting (Slow / Normal / Fast)
-            - 🌊 Tempo system (Calm → Pressure → Reward)
-            - 💥 Freeze frame + shockwave on death
-            - 🎯 Near-miss risk window bonus
+
+            ### ✨ Features
+            - 🕹️ Virtual joystick control — full freedom of movement
+            - 🌊 Tempo system — Calm, Pressure, Reward phases
+            - 💥 Freeze frame + shockwave death effects
             - 🔥 Overdrive mode at combo x8
+            - ⚡ 4 power-ups: Magnet, Slow-Mo, Double, Shield
             - 📊 Score milestones with celebrations
-            - 🌟 Speed lines + vignette effects
-            - 🛡️ Spawn warnings for fair gameplay
-            
-            ### 📦 Download
-            - **Release APK** — Signed, ready to install
-            - **Debug APK** — For testing
-            
+            - ⚙️ Difficulty + Game Speed settings
+            - 🔊 Programmatic audio — zero sound files
+            - 🎨 100% Canvas API graphics — zero image files
+
             ### 📱 Requirements
             - Android 5.0+ (API 21)
-            - No permissions needed (except optional vibration)
+
+            ### 📦 Install
+            Download **StellarDrift-v2.0-release.apk** and install.
           files: |
             app/build/outputs/apk/release/StellarDrift-v2.0-release.apk
             app/build/outputs/apk/debug/StellarDrift-v2.0-debug.apk
