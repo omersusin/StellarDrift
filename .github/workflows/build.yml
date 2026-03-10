@@ -35,8 +35,7 @@ jobs:
         run: chmod +x gradlew
 
       - name: Decode Keystore
-        run: |
-          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > stellar-drift.jks
+        run: echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > stellar-drift.jks
 
       - name: Build Debug APK
         run: ./gradlew assembleDebug
@@ -50,21 +49,21 @@ jobs:
 
       - name: Rename APKs
         run: |
-          mv app/build/outputs/apk/debug/*.apk app/build/outputs/apk/debug/StellarDrift-v2.0-debug.apk || true
-          mv app/build/outputs/apk/release/*.apk app/build/outputs/apk/release/StellarDrift-v2.0-release.apk || true
+          mv app/build/outputs/apk/debug/*.apk app/build/outputs/apk/debug/StellarDrift-debug.apk || true
+          mv app/build/outputs/apk/release/*.apk app/build/outputs/apk/release/StellarDrift-release.apk || true
 
       - name: Upload Debug APK
         uses: actions/upload-artifact@v4
         with:
           name: StellarDrift-debug
-          path: app/build/outputs/apk/debug/StellarDrift-v2.0-debug.apk
+          path: app/build/outputs/apk/debug/StellarDrift-debug.apk
           retention-days: 30
 
       - name: Upload Release APK
         uses: actions/upload-artifact@v4
         with:
           name: StellarDrift-release
-          path: app/build/outputs/apk/release/StellarDrift-v2.0-release.apk
+          path: app/build/outputs/apk/release/StellarDrift-release.apk
           retention-days: 30
 
       - name: Create GitHub Release
@@ -74,27 +73,29 @@ jobs:
           name: "Stellar Drift ${{ github.ref_name }}"
           body: |
             ## 🚀 Stellar Drift ${{ github.ref_name }}
-
+            
             **An endless space survival game — made entirely by AI.**
-
-            ### ✨ Features
-            - 🕹️ Virtual joystick control — full freedom of movement
+            
+            ### ✨ What's New
+            - 🎨 Custom app icon — programmatic spaceship logo
+            - 🕹️ Virtual joystick — full directional control
+            - 🚀 Free movement — fly anywhere on screen
+            - ⚡ Game speed setting — Slow / Normal / Fast
             - 🌊 Tempo system — Calm, Pressure, Reward phases
-            - 💥 Freeze frame + shockwave death effects
-            - 🔥 Overdrive mode at combo x8
-            - ⚡ 4 power-ups: Magnet, Slow-Mo, Double, Shield
+            - 💥 Freeze frame + shockwave on death
+            - 🔥 Overdrive at combo x8
+            - 🛡️ 4 power-ups: Magnet, Slow-Mo, Double, Shield
             - 📊 Score milestones with celebrations
-            - ⚙️ Difficulty + Game Speed settings
-            - 🔊 Programmatic audio — zero sound files
-            - 🎨 100% Canvas API graphics — zero image files
-
+            - 🔊 100% programmatic audio — zero files
+            - 🎨 100% Canvas API graphics — zero images
+            
             ### 📱 Requirements
             - Android 5.0+ (API 21)
-
+            
             ### 📦 Install
-            Download **StellarDrift-v2.0-release.apk** and install.
+            Download **StellarDrift-release.apk** and install.
           files: |
-            app/build/outputs/apk/release/StellarDrift-v2.0-release.apk
-            app/build/outputs/apk/debug/StellarDrift-v2.0-debug.apk
+            app/build/outputs/apk/release/StellarDrift-release.apk
+            app/build/outputs/apk/debug/StellarDrift-debug.apk
           draft: false
           prerelease: false
