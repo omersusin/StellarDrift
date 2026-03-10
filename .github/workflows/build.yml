@@ -26,8 +26,7 @@ jobs:
         uses: gradle/actions/setup-gradle@v3
 
       - name: Generate Gradle Wrapper
-        run: |
-          gradle wrapper --gradle-version 8.2
+        run: gradle wrapper --gradle-version 8.2
 
       - name: Grant execute permission
         run: chmod +x gradlew
@@ -35,9 +34,19 @@ jobs:
       - name: Build Debug APK
         run: ./gradlew assembleDebug
 
-      - name: Upload APK
+      - name: Build Release APK
+        run: ./gradlew assembleRelease
+
+      - name: Upload Debug APK
         uses: actions/upload-artifact@v4
         with:
-          name: StellarDrift-v1.0-debug
+          name: StellarDrift-v2.0-debug
           path: app/build/outputs/apk/debug/*.apk
+          retention-days: 30
+
+      - name: Upload Release APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: StellarDrift-v2.0-release
+          path: app/build/outputs/apk/release/*.apk
           retention-days: 30

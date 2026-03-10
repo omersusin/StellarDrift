@@ -7,6 +7,7 @@ public class SettingsManager {
 
     private SharedPreferences prefs;
     private int difficulty;
+    private int gameSpeed;
     private boolean vibrationEnabled;
     private boolean soundEnabled;
     private int highScore;
@@ -19,6 +20,7 @@ public class SettingsManager {
 
     private void load() {
         difficulty = prefs.getInt(Constants.KEY_DIFFICULTY, Constants.DIFF_NORMAL);
+        gameSpeed = prefs.getInt(Constants.KEY_GAME_SPEED, Constants.SPEED_NORMAL);
         vibrationEnabled = prefs.getBoolean(Constants.KEY_VIBRATION, true);
         soundEnabled = prefs.getBoolean(Constants.KEY_SOUND, true);
         highScore = prefs.getInt(Constants.KEY_HIGH_SCORE, 0);
@@ -27,57 +29,38 @@ public class SettingsManager {
     private void save() {
         prefs.edit()
             .putInt(Constants.KEY_DIFFICULTY, difficulty)
+            .putInt(Constants.KEY_GAME_SPEED, gameSpeed)
             .putBoolean(Constants.KEY_VIBRATION, vibrationEnabled)
             .putBoolean(Constants.KEY_SOUND, soundEnabled)
             .putInt(Constants.KEY_HIGH_SCORE, highScore)
             .apply();
     }
 
+    // Difficulty
     public int getDifficulty() { return difficulty; }
-    public void setDifficulty(int d) {
-        difficulty = Math.max(0, Math.min(2, d));
-        save();
-    }
-    public void cycleDifficulty() {
-        difficulty = (difficulty + 1) % 3;
-        save();
-    }
+    public void cycleDifficulty() { difficulty = (difficulty + 1) % 3; save(); }
+    public float getSpeedMultiplier() { return Constants.DIFF_SPEED_MULT[difficulty]; }
+    public int getSpawnInterval() { return Constants.DIFF_SPAWN_MULT[difficulty]; }
+    public String getDifficultyName() { return Constants.DIFF_NAMES[difficulty]; }
+    public int getDifficultyColor() { return Constants.DIFF_COLORS[difficulty]; }
 
-    public boolean isVibrationEnabled() { return vibrationEnabled; }
-    public void toggleVibration() {
-        vibrationEnabled = !vibrationEnabled;
-        save();
-    }
+    // Game Speed
+    public int getGameSpeed() { return gameSpeed; }
+    public void cycleGameSpeed() { gameSpeed = (gameSpeed + 1) % 3; save(); }
+    public float getGameSpeedMultiplier() { return Constants.SPEED_MULT[gameSpeed]; }
+    public String getGameSpeedName() { return Constants.SPEED_NAMES[gameSpeed]; }
+    public int getGameSpeedColor() { return Constants.SPEED_COLORS[gameSpeed]; }
 
+    // Sound & Vibration
     public boolean isSoundEnabled() { return soundEnabled; }
-    public void toggleSound() {
-        soundEnabled = !soundEnabled;
-        save();
-    }
+    public void toggleSound() { soundEnabled = !soundEnabled; save(); }
+    public boolean isVibrationEnabled() { return vibrationEnabled; }
+    public void toggleVibration() { vibrationEnabled = !vibrationEnabled; save(); }
 
+    // High Score
     public int getHighScore() { return highScore; }
     public boolean setHighScore(int score) {
-        if (score > highScore) {
-            highScore = score;
-            save();
-            return true;
-        }
+        if (score > highScore) { highScore = score; save(); return true; }
         return false;
-    }
-
-    public float getSpeedMultiplier() {
-        return Constants.DIFF_SPEED_MULT[difficulty];
-    }
-
-    public int getSpawnInterval() {
-        return Constants.DIFF_SPAWN_MULT[difficulty];
-    }
-
-    public String getDifficultyName() {
-        return Constants.DIFF_NAMES[difficulty];
-    }
-
-    public int getDifficultyColor() {
-        return Constants.DIFF_COLORS[difficulty];
     }
 }

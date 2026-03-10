@@ -31,7 +31,6 @@ public class Player {
     private int shieldTimer;
     private float shieldPulse;
 
-    // Overdrive
     private boolean overdrive;
     private int overdriveTimer;
     private float overdrivePulse;
@@ -45,7 +44,8 @@ public class Player {
     public Player(int sw, int sh) {
         screenW = sw; screenH = sh;
         size = sw * Constants.PLAYER_SIZE_RATIO;
-        x = sw / 2f; y = sh * 0.82f;
+        x = sw / 2f;
+        y = sh * Constants.PLAYER_START_Y_RATIO;
         prevX = x;
         bankAngle = 0; targetBank = 0;
 
@@ -87,22 +87,33 @@ public class Player {
         shieldPaint.setStrokeWidth(2.5f);
     }
 
-    public void update(float touchX, boolean touching) {
+    public void update(float dirX, float dirY, float magnitude) {
         prevX = x;
-        if (touching && touchX >= 0) {
-            float target = Math.max(size, Math.min(screenW - size, touchX));
-            x += (target - x) * Constants.PLAYER_FOLLOW_SPEED;
+
+        // Joystick movement — tüm yönlere
+        if (magnitude > Constants.JOY_DEAD_ZONE) {
+            float adjMag = (magnitude - Constants.JOY_DEAD_ZONE)
+                         / (1f - Constants.JOY_DEAD_ZONE);
+            float speed = screenW * Constants.PLAYER_MOVE_SPEED * adjMag;
+            x += dirX * speed;
+            y += dirY * speed;
         }
+
+        // Sınırları koru
+        x = Math.max(size, Math.min(screenW - size, x));
+        y = Math.max(screenH * Constants.PLAYER_Y_MIN_RATIO,
+                     Math.min(screenH * Constants.PLAYER_Y_MAX_RATIO, y));
 
         // Banking
         float dx = x - prevX;
         targetBank = Math.max(-Constants.PLAYER_MAX_BANK_ANGLE,
-            Math.min(Constants.PLAYER_MAX_BANK_ANGLE,
-                dx * 2.5f));
+            Math.min(Constants.PLAYER_MAX_BANK_ANGLE, dx * 2.5f));
         bankAngle += (targetBank - bankAngle) * Constants.PLAYER_BANK_SPEED;
 
+        // Trail
         trailIdx = (trailIdx + 1) % TRAIL_LEN;
         trailX[trailIdx] = x; trailY[trailIdx] = y;
+
         glowPulse += 0.06f;
         engineFlicker = 0.7f + (float)(Math.random() * 0.3);
 
@@ -122,12 +133,10 @@ public class Player {
 
         c.save();
         c.rotate(bankAngle, x, y);
-
         renderEngine(c);
         buildShip();
         renderShip(c);
         renderDetails(c);
-
         c.restore();
 
         if (overdrive) renderOverdrive(c);
@@ -135,8 +144,7 @@ public class Player {
     }
 
     private void renderTrail(Canvas c) {
-        int trailLen = overdrive ? TRAIL_LEN : TRAIL_LEN;
-        for (int i = 0; i < trailLen; i++) {
+        for (int i = 0; i < TRAIL_LEN; i++) {
             int idx = (trailIdx - i + TRAIL_LEN) % TRAIL_LEN;
             float a = 1f - (i / (float) TRAIL_LEN);
             if (overdrive) {
@@ -274,7 +282,9 @@ public class Player {
     }
 
     public void reset() {
-        x = screenW / 2f; prevX = x;
+        x = screenW / 2f;
+        y = screenH * Constants.PLAYER_START_Y_RATIO;
+        prevX = x;
         bankAngle = 0; targetBank = 0;
         shielded = false; shieldTimer = 0;
         overdrive = false; overdriveTimer = 0;

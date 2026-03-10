@@ -22,10 +22,9 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback {
     private SpaceBackground background;
     private Renderer renderer;
     private UIOverlay uiOverlay;
+    private Joystick joystick;
 
     private int screenW, screenH;
-    private float touchX = -1;
-    private boolean touching = false;
 
     private Paint vignettePaint;
     private RadialGradient vignetteNormal, vignetteDanger;
@@ -49,6 +48,7 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback {
         if (gameWorld == null) gameWorld = new GameWorld(screenW, screenH, getContext());
         if (renderer == null) renderer = new Renderer();
         if (uiOverlay == null) uiOverlay = new UIOverlay(screenW, screenH);
+        if (joystick == null) joystick = new Joystick(screenW);
         initVignette();
         startLoop(holder);
     }
@@ -96,17 +96,24 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback {
     @Override
     public boolean onTouchEvent(MotionEvent event) {
         float ex = event.getX(), ey = event.getY();
+        int state = gameWorld != null ? gameWorld.getState() : Constants.STATE_MENU;
+
         switch (event.getAction()) {
             case MotionEvent.ACTION_DOWN:
-                touching = true; touchX = ex;
-                handleTap(ex, ey);
+                if (state == Constants.STATE_PLAYING) {
+                    joystick.onTouchDown(ex, ey);
+                } else {
+                    handleTap(ex, ey);
+                }
                 break;
             case MotionEvent.ACTION_MOVE:
-                touchX = ex;
+                if (state == Constants.STATE_PLAYING) {
+                    joystick.onTouchMove(ex, ey);
+                }
                 break;
             case MotionEvent.ACTION_UP:
             case MotionEvent.ACTION_CANCEL:
-                touching = false; touchX = -1;
+                joystick.onTouchUp();
                 break;
         }
         return true;
@@ -117,24 +124,17 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback {
         int state = gameWorld.getState();
 
         if (state == Constants.STATE_MENU) {
-            if (uiOverlay.isPlayHit(x, y)) {
-                uiOverlay.resetGameOver();
-                gameWorld.startGame();
-            }
+            if (uiOverlay.isPlayHit(x, y)) { uiOverlay.resetGameOver(); gameWorld.startGame(); }
             else if (uiOverlay.isSettingsHit(x, y)) gameWorld.openSettings();
         } else if (state == Constants.STATE_SETTINGS) {
             if (uiOverlay.isDiffHit(x, y)) gameWorld.cycleDifficulty();
+            else if (uiOverlay.isSpeedHit(x, y)) gameWorld.cycleGameSpeed();
             else if (uiOverlay.isSoundHit(x, y)) gameWorld.toggleSound();
             else if (uiOverlay.isVibHit(x, y)) gameWorld.toggleVibration();
             else if (uiOverlay.isBackHit(x, y)) gameWorld.closeSettings();
         } else if (state == Constants.STATE_GAME_OVER) {
-            if (uiOverlay.isRestartHit(x, y)) {
-                uiOverlay.resetGameOver();
-                gameWorld.startGame();
-            } else {
-                gameWorld.handleTap();
-                uiOverlay.resetGameOver();
-            }
+            if (uiOverlay.isRestartHit(x, y)) { uiOverlay.resetGameOver(); gameWorld.startGame(); }
+            else { gameWorld.handleTap(); uiOverlay.resetGameOver(); }
         }
     }
 
@@ -142,7 +142,7 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback {
         if (background != null && gameWorld != null)
             background.update(gameWorld.getDifficulty(), gameWorld.getTempoPhase());
         if (gameWorld != null)
-            gameWorld.update(touchX, touching);
+            gameWorld.update(joystick.getDirX(), joystick.getDirY(), joystick.getMagnitude());
     }
 
     public void drawGame(Canvas canvas) {
@@ -161,16 +161,18 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback {
         drawVignette(canvas);
         drawRiskBorder(canvas);
 
+        // Joystick — oyun sırasında
+        if (gameWorld != null && gameWorld.getState() == Constants.STATE_PLAYING)
+            joystick.render(canvas);
+
         if (uiOverlay != null && gameWorld != null)
             uiOverlay.renderFull(canvas, gameWorld);
     }
 
     private void drawVignette(Canvas canvas) {
         if (gameWorld == null || gameWorld.getState() != Constants.STATE_PLAYING) {
-            vignettePaint.setShader(vignetteNormal);
-            vignettePaint.setAlpha(255);
-            canvas.drawRect(0, 0, screenW, screenH, vignettePaint);
-            return;
+            vignettePaint.setShader(vignetteNormal); vignettePaint.setAlpha(255);
+            canvas.drawRect(0, 0, screenW, screenH, vignettePaint); return;
         }
         float danger = gameWorld.getDangerLevel();
         currentDanger += (danger - currentDanger) * 0.1f;
@@ -178,8 +180,7 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback {
             vignettePaint.setShader(vignetteDanger);
             vignettePaint.setAlpha((int)(currentDanger * 255));
         } else {
-            vignettePaint.setShader(vignetteNormal);
-            vignettePaint.setAlpha(255);
+            vignettePaint.setShader(vignetteNormal); vignettePaint.setAlpha(255);
         }
         canvas.drawRect(0, 0, screenW, screenH, vignettePaint);
     }
@@ -190,8 +191,7 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback {
         float progress = timer / (float) Constants.RISK_WINDOW_DURATION;
         float blink = progress < 0.25f ? (float)(Math.sin(timer * 0.5) * 0.4 + 0.6) : 1f;
         int alpha = (int)(120 * progress * blink);
-        riskBorderPaint.setAlpha(alpha);
-        riskBorderPaint.setStrokeWidth(3f);
+        riskBorderPaint.setAlpha(alpha); riskBorderPaint.setStrokeWidth(3f);
         canvas.drawLine(0, 0, screenW, 0, riskBorderPaint);
         canvas.drawLine(0, screenH, screenW, screenH, riskBorderPaint);
         canvas.drawLine(0, 0, 0, screenH, riskBorderPaint);
