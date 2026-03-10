@@ -20,12 +20,17 @@ public class UIOverlay {
     private Paint dimPaint, accentPaint, labelPaint, valuePaint;
     private Paint hudScorePaint, hudLabelPaint, diffBarBg, diffBarFill;
     private Paint comboPaint, powerBarBg, powerBarFill, statPaint;
+    private Paint milestonePaint, tempoPaint, riskPaint;
 
     private RectF playBtn, settingsBtn, backBtn;
     private RectF diffBtn, soundBtn, vibBtn;
     private RectF restartBtn;
 
     private float pulse;
+
+    // Game over timing
+    private long gameOverTime;
+    private static final long BUTTON_DELAY = 1200;
 
     private static final int CYAN = 0xFF00E5FF;
     private static final int PURPLE = 0xFF7C4DFF;
@@ -34,9 +39,8 @@ public class UIOverlay {
     private static final int DIM = 0xCC050510;
 
     public UIOverlay(int sw, int sh) {
-        this.sw = sw;
-        this.sh = sh;
-        pulse = 0;
+        this.sw = sw; this.sh = sh;
+        pulse = 0; gameOverTime = 0;
 
         titlePaint = makePaint(CYAN, sw * 0.1f, Paint.Align.CENTER, true);
         subtitlePaint = makePaint(WHITE, sw * 0.035f, Paint.Align.CENTER, false);
@@ -48,8 +52,7 @@ public class UIOverlay {
         btnPaint.setStyle(Paint.Style.FILL); btnPaint.setColor(0x33FFFFFF);
         btnOutlinePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
         btnOutlinePaint.setStyle(Paint.Style.STROKE);
-        btnOutlinePaint.setStrokeWidth(2f); btnOutlinePaint.setColor(CYAN);
-        btnOutlinePaint.setAlpha(120);
+        btnOutlinePaint.setStrokeWidth(2f); btnOutlinePaint.setColor(CYAN); btnOutlinePaint.setAlpha(120);
         btnTextPaint = makePaint(WHITE, sw * 0.04f, Paint.Align.CENTER, true);
 
         dimPaint = new Paint(); dimPaint.setColor(DIM); dimPaint.setStyle(Paint.Style.FILL);
@@ -59,16 +62,18 @@ public class UIOverlay {
 
         hudScorePaint = makePaint(WHITE, sw * 0.055f, Paint.Align.LEFT, true);
         hudLabelPaint = makePaint(0x99FFFFFF, sw * 0.022f, Paint.Align.LEFT, false);
-
         comboPaint = makePaint(GOLD, sw * 0.05f, Paint.Align.CENTER, true);
 
         diffBarBg = new Paint(Paint.ANTI_ALIAS_FLAG); diffBarBg.setColor(0x33FFFFFF);
         diffBarFill = new Paint(Paint.ANTI_ALIAS_FLAG); diffBarFill.setColor(CYAN);
-
         powerBarBg = new Paint(Paint.ANTI_ALIAS_FLAG); powerBarBg.setColor(0x33FFFFFF);
         powerBarFill = new Paint(Paint.ANTI_ALIAS_FLAG);
 
         statPaint = makePaint(0xFFB0BEC5, sw * 0.03f, Paint.Align.LEFT, false);
+
+        milestonePaint = makePaint(GOLD, sw * 0.06f, Paint.Align.CENTER, true);
+        tempoPaint = makePaint(WHITE, sw * 0.02f, Paint.Align.RIGHT, false);
+        riskPaint = makePaint(GOLD, sw * 0.025f, Paint.Align.CENTER, true);
 
         float cx = sw / 2f;
         float bw = sw * 0.55f, bh = sh * 0.065f;
@@ -81,7 +86,6 @@ public class UIOverlay {
         soundBtn = new RectF(cx - sbw/2, sy + sbh * 1.6f, cx + sbw/2, sy + sbh * 2.6f);
         vibBtn = new RectF(cx - sbw/2, sy + sbh * 3.2f, cx + sbw/2, sy + sbh * 4.2f);
         backBtn = new RectF(cx - bw/2, sh * 0.72f, cx + bw/2, sh * 0.72f + bh);
-
         restartBtn = new RectF(cx - bw/2, sh * 0.74f, cx + bw/2, sh * 0.74f + bh);
     }
 
@@ -92,17 +96,6 @@ public class UIOverlay {
         return p;
     }
 
-    public void render(Canvas c, int state, int score, int highScore,
-                       float difficulty, SettingsManager settings) {
-        pulse += 0.04f;
-        switch (state) {
-            case Constants.STATE_MENU: drawMenu(c, highScore); break;
-            case Constants.STATE_PLAYING: drawHUD(c, score, difficulty, null); break;
-            case Constants.STATE_GAME_OVER: drawGameOver(c, score, highScore, null); break;
-            case Constants.STATE_SETTINGS: drawSettings(c, settings); break;
-        }
-    }
-
     public void renderFull(Canvas c, GameWorld world) {
         pulse += 0.04f;
         int state = world.getState();
@@ -111,16 +104,19 @@ public class UIOverlay {
                 drawMenu(c, world.getHighScore());
                 break;
             case Constants.STATE_PLAYING:
-                drawHUD(c, world.getScore(), world.getDifficulty(), world);
+                drawHUD(c, world);
+                drawMilestone(c, world);
                 break;
             case Constants.STATE_GAME_OVER:
-                drawGameOver(c, world.getScore(), world.getHighScore(), world);
+                drawGameOver(c, world);
                 break;
             case Constants.STATE_SETTINGS:
                 drawSettings(c, world.getSettings());
                 break;
         }
     }
+
+    // ==================== MENU ====================
 
     private void drawMenu(Canvas c, int highScore) {
         float p = (float)(Math.sin(pulse) * 0.08 + 0.92);
@@ -154,14 +150,17 @@ public class UIOverlay {
         subtitlePaint.setAlpha((int)(150 * pa));
         c.drawText("Touch & drag to navigate the stars", cx, sh * 0.85f, subtitlePaint);
         smallPaint.setAlpha(80);
-        c.drawText("v1.1", cx, sh * 0.95f, smallPaint);
+        c.drawText("v1.2", cx, sh * 0.95f, smallPaint);
     }
 
-    private void drawHUD(Canvas c, int score, float difficulty, GameWorld world) {
-        float pad = sw * 0.04f;
+    // ==================== HUD ====================
 
-        hudLabelPaint.setAlpha(150);
-        hudLabelPaint.setTextAlign(Paint.Align.LEFT);
+    private void drawHUD(Canvas c, GameWorld world) {
+        float pad = sw * 0.04f;
+        int score = world.getScore();
+
+        // Score
+        hudLabelPaint.setAlpha(150); hudLabelPaint.setTextAlign(Paint.Align.LEFT);
         c.drawText("SCORE", pad, sh * 0.04f, hudLabelPaint);
         hudScorePaint.setColor(WHITE);
         c.drawText(String.valueOf(score), pad, sh * 0.075f, hudScorePaint);
@@ -171,7 +170,7 @@ public class UIOverlay {
         float barX = sw - pad - barW, barY = sh * 0.04f;
         RectF bgR = new RectF(barX, barY, barX + barW, barY + barH);
         c.drawRoundRect(bgR, barH, barH, diffBarBg);
-        float fill = Math.min(1f, (difficulty - 1f) / (Constants.MAX_DIFFICULTY - 1f));
+        float fill = Math.min(1f, (world.getDifficulty() - 1f) / (Constants.MAX_DIFFICULTY - 1f));
         RectF fillR = new RectF(barX, barY, barX + barW * fill, barY + barH);
         int barCol = fill < 0.5f ? CYAN : (fill < 0.8f ? GOLD : 0xFFFF1744);
         diffBarFill.setColor(barCol);
@@ -179,9 +178,10 @@ public class UIOverlay {
         hudLabelPaint.setTextAlign(Paint.Align.RIGHT);
         c.drawText("SPEED", sw - pad, sh * 0.065f, hudLabelPaint);
 
-        if (world == null) return;
+        // Tempo indicator
+        drawTempoIndicator(c, world, pad);
 
-        // Combo display
+        // Combo
         int combo = world.getCombo();
         if (combo > 1) {
             float cp = (float)(Math.sin(pulse * 4) * 0.1 + 0.9);
@@ -189,6 +189,14 @@ public class UIOverlay {
             comboPaint.setColor(combo >= 10 ? 0xFFFF6D00 : combo >= 5 ? GOLD : WHITE);
             comboPaint.setAlpha(220);
             c.drawText("x" + combo + " COMBO", sw / 2f, sh * 0.13f, comboPaint);
+        }
+
+        // Risk window label
+        if (world.isRiskWindowActive()) {
+            float rp = (float)(Math.sin(pulse * 5) * 0.15 + 0.85);
+            riskPaint.setAlpha((int)(220 * rp));
+            riskPaint.setTextSize(sw * 0.025f);
+            c.drawText("⚡ RISK x1.5 ⚡", sw / 2f, sh * 0.16f, riskPaint);
         }
 
         // Power-up bars
@@ -217,6 +225,27 @@ public class UIOverlay {
         }
     }
 
+    private void drawTempoIndicator(Canvas c, GameWorld world, float pad) {
+        int tempo = world.getTempoPhase();
+        String label;
+        int color;
+        switch (tempo) {
+            case Constants.TEMPO_PRESSURE:
+                label = "▲ PRESSURE"; color = 0xFFFF1744; break;
+            case Constants.TEMPO_REWARD:
+                label = "★ REWARD"; color = GOLD; break;
+            default:
+                label = ""; color = 0; break;
+        }
+        if (label.length() > 0) {
+            float tp = (float)(Math.sin(pulse * 3) * 0.15 + 0.85);
+            tempoPaint.setColor(color);
+            tempoPaint.setAlpha((int)(180 * tp));
+            tempoPaint.setTextAlign(Paint.Align.RIGHT);
+            c.drawText(label, sw - pad, sh * 0.095f, tempoPaint);
+        }
+    }
+
     private void drawPowerBar(Canvas c, float x, float y, float w, float h,
                               String name, int timer, int maxTimer, int color) {
         hudLabelPaint.setTextAlign(Paint.Align.LEFT);
@@ -235,71 +264,157 @@ public class UIOverlay {
         c.drawRoundRect(fl, h, h, powerBarFill);
     }
 
-    private void drawGameOver(Canvas c, int score, int highScore, GameWorld world) {
+    // ==================== MILESTONE ====================
+
+    private void drawMilestone(Canvas c, GameWorld world) {
+        if (world.getMilestoneTimer() <= 0 || world.getMilestoneText() == null) return;
+
+        float progress = world.getMilestoneTimer() / 90f;
+        float scale;
+        if (progress > 0.8f) {
+            scale = 1f + (progress - 0.8f) / 0.2f * 0.5f;
+        } else {
+            scale = 1f;
+        }
+
+        milestonePaint.setTextSize(sw * 0.06f * scale);
+        milestonePaint.setAlpha((int)(255 * Math.min(1f, progress * 2)));
+        c.drawText(world.getMilestoneText(), sw / 2f, sh * 0.35f, milestonePaint);
+    }
+
+    // ==================== GAME OVER ====================
+
+    private void drawGameOver(Canvas c, GameWorld world) {
+        int score = world.getScore();
+        int highScore = world.getHighScore();
+
+        if (gameOverTime == 0) gameOverTime = System.currentTimeMillis();
+        long elapsed = System.currentTimeMillis() - gameOverTime;
+
         c.drawRect(0, 0, sw, sh, dimPaint);
         float cx = sw / 2f;
 
+        // Title
         accentPaint.setColor(0xFFFF1744);
         accentPaint.setTextSize(sw * 0.08f);
+        accentPaint.setAlpha(255);
         c.drawText("GAME OVER", cx, sh * 0.2f, accentPaint);
+
+        // Score count-up animation
+        float countProgress = Math.min(1f, elapsed / 800f);
+        countProgress = 1f - (1f - countProgress) * (1f - countProgress);
+        int displayScore = (int)(score * countProgress);
 
         scorePaint.setColor(WHITE);
         scorePaint.setTextSize(sw * 0.12f);
-        c.drawText(String.valueOf(score), cx, sh * 0.32f, scorePaint);
+        scorePaint.setAlpha(255);
+        c.drawText(String.valueOf(displayScore), cx, sh * 0.32f, scorePaint);
         smallPaint.setAlpha(180);
         c.drawText("SCORE", cx, sh * 0.35f, smallPaint);
 
-        if (score >= highScore && score > 0) {
-            accentPaint.setColor(GOLD);
-            accentPaint.setTextSize(sw * 0.04f);
-            float np = (float)(Math.sin(pulse * 3) * 0.15 + 0.85);
-            accentPaint.setAlpha((int)(255 * np));
-            c.drawText("★ NEW BEST! ★", cx, sh * 0.41f, accentPaint);
-        } else {
-            smallPaint.setAlpha(140);
-            c.drawText("BEST: " + highScore, cx, sh * 0.41f, smallPaint);
+        // High score
+        if (elapsed > 800) {
+            if (score >= highScore && score > 0) {
+                accentPaint.setColor(GOLD);
+                accentPaint.setTextSize(sw * 0.04f);
+                float np = (float)(Math.sin(pulse * 3) * 0.15 + 0.85);
+                accentPaint.setAlpha((int)(255 * np));
+                c.drawText("★ NEW BEST! ★", cx, sh * 0.41f, accentPaint);
+            } else {
+                smallPaint.setAlpha(140);
+                c.drawText("BEST: " + highScore, cx, sh * 0.41f, smallPaint);
+            }
         }
 
-        // Stats
-        if (world != null) {
-            float statX = sw * 0.2f;
-            float statY = sh * 0.48f;
-            float gap = sh * 0.04f;
-
-            statPaint.setColor(0xFFB0BEC5); statPaint.setTextAlign(Paint.Align.LEFT);
-            Paint sv = new Paint(statPaint);
-            sv.setTextAlign(Paint.Align.RIGHT); sv.setColor(WHITE);
-            sv.setTypeface(Typeface.DEFAULT_BOLD);
-
-            float rightX = sw * 0.8f;
-
-            c.drawText("Orbs Collected", statX, statY, statPaint);
-            c.drawText(String.valueOf(world.getOrbsCollected()), rightX, statY, sv);
-
-            c.drawText("Near Misses", statX, statY + gap, statPaint);
-            c.drawText(String.valueOf(world.getNearMissCount()), rightX, statY + gap, sv);
-
-            c.drawText("Max Combo", statX, statY + gap * 2, statPaint);
-            sv.setColor(world.getMaxCombo() >= 5 ? GOLD : WHITE);
-            c.drawText("x" + world.getMaxCombo(), rightX, statY + gap * 2, sv);
-
-            c.drawText("Survival Time", statX, statY + gap * 3, statPaint);
-            sv.setColor(WHITE);
-            c.drawText(world.getSurvivalTime() + "s", rightX, statY + gap * 3, sv);
+        // Stats (appear after 600ms)
+        if (elapsed > 600) {
+            float statAlpha = Math.min(1f, (elapsed - 600) / 400f);
+            drawStats(c, world, statAlpha);
         }
 
-        // Restart button
-        drawButton(c, restartBtn, "▶  PLAY AGAIN", CYAN);
+        // Buttons (delayed)
+        if (elapsed > BUTTON_DELAY) {
+            float btnAlpha = Math.min(1f, (elapsed - BUTTON_DELAY) / 500f);
+            int prevAlpha = btnPaint.getAlpha();
+            int prevOutAlpha = btnOutlinePaint.getAlpha();
+            int prevTextAlpha = btnTextPaint.getAlpha();
 
-        float p2 = (float)(Math.sin(pulse * 1.5) * 0.3 + 0.7);
-        subtitlePaint.setAlpha((int)(120 * p2));
-        c.drawText("or tap anywhere to go to menu", cx, sh * 0.87f, subtitlePaint);
+            btnPaint.setAlpha((int)(0x33 * btnAlpha));
+            btnOutlinePaint.setAlpha((int)(140 * btnAlpha));
+            btnTextPaint.setAlpha((int)(255 * btnAlpha));
+
+            drawButton(c, restartBtn, "▶  PLAY AGAIN", CYAN);
+
+            btnPaint.setAlpha(prevAlpha);
+            btnOutlinePaint.setAlpha(prevOutAlpha);
+            btnTextPaint.setAlpha(prevTextAlpha);
+
+            float p2 = (float)(Math.sin(pulse * 1.5) * 0.3 + 0.7);
+            subtitlePaint.setAlpha((int)(80 * btnAlpha * p2));
+            c.drawText("or tap anywhere for menu", cx, sh * 0.87f, subtitlePaint);
+        }
     }
+
+    private void drawStats(Canvas c, GameWorld world, float alpha) {
+        float statX = sw * 0.2f;
+        float statY = sh * 0.48f;
+        float gap = sh * 0.04f;
+        float rightX = sw * 0.8f;
+
+        int sAlpha = (int)(200 * alpha);
+        int vAlpha = (int)(255 * alpha);
+
+        statPaint.setTextAlign(Paint.Align.LEFT);
+
+        statPaint.setColor(0xFFB0BEC5); statPaint.setAlpha(sAlpha);
+        c.drawText("Orbs Collected", statX, statY, statPaint);
+        statPaint.setColor(WHITE); statPaint.setAlpha(vAlpha);
+        statPaint.setTextAlign(Paint.Align.RIGHT);
+        statPaint.setTypeface(Typeface.DEFAULT_BOLD);
+        c.drawText(String.valueOf(world.getOrbsCollected()), rightX, statY, statPaint);
+
+        statPaint.setTextAlign(Paint.Align.LEFT);
+        statPaint.setColor(0xFFB0BEC5); statPaint.setAlpha(sAlpha);
+        statPaint.setTypeface(Typeface.DEFAULT);
+        c.drawText("Near Misses", statX, statY + gap, statPaint);
+        statPaint.setTextAlign(Paint.Align.RIGHT);
+        statPaint.setColor(WHITE); statPaint.setAlpha(vAlpha);
+        statPaint.setTypeface(Typeface.DEFAULT_BOLD);
+        c.drawText(String.valueOf(world.getNearMissCount()), rightX, statY + gap, statPaint);
+
+        statPaint.setTextAlign(Paint.Align.LEFT);
+        statPaint.setColor(0xFFB0BEC5); statPaint.setAlpha(sAlpha);
+        statPaint.setTypeface(Typeface.DEFAULT);
+        c.drawText("Max Combo", statX, statY + gap * 2, statPaint);
+        statPaint.setTextAlign(Paint.Align.RIGHT);
+        int mc = world.getMaxCombo();
+        statPaint.setColor(mc >= 5 ? GOLD : WHITE);
+        statPaint.setAlpha(vAlpha);
+        statPaint.setTypeface(Typeface.DEFAULT_BOLD);
+        c.drawText("x" + mc, rightX, statY + gap * 2, statPaint);
+
+        statPaint.setTextAlign(Paint.Align.LEFT);
+        statPaint.setColor(0xFFB0BEC5); statPaint.setAlpha(sAlpha);
+        statPaint.setTypeface(Typeface.DEFAULT);
+        c.drawText("Survival Time", statX, statY + gap * 3, statPaint);
+        statPaint.setTextAlign(Paint.Align.RIGHT);
+        statPaint.setColor(WHITE); statPaint.setAlpha(vAlpha);
+        statPaint.setTypeface(Typeface.DEFAULT_BOLD);
+        c.drawText(world.getSurvivalTime() + "s", rightX, statY + gap * 3, statPaint);
+    }
+
+    // Game over resetlenmeli
+    public void resetGameOver() {
+        gameOverTime = 0;
+    }
+
+    // ==================== SETTINGS ====================
 
     private void drawSettings(Canvas c, SettingsManager settings) {
         c.drawRect(0, 0, sw, sh, dimPaint);
         float cx = sw / 2f;
         accentPaint.setColor(CYAN); accentPaint.setTextSize(sw * 0.06f);
+        accentPaint.setAlpha(255);
         c.drawText("SETTINGS", cx, sh * 0.2f, accentPaint);
 
         drawSettingRow(c, diffBtn, "DIFFICULTY",
@@ -318,17 +433,17 @@ public class UIOverlay {
         c.drawRoundRect(rect, rect.height() * 0.4f, rect.height() * 0.4f, btnPaint);
         c.drawRoundRect(rect, rect.height() * 0.4f, rect.height() * 0.4f, btnOutlinePaint);
         float cy = rect.centerY() + sw * 0.012f;
-        labelPaint.setTextAlign(Paint.Align.LEFT);
+        labelPaint.setTextAlign(Paint.Align.LEFT); labelPaint.setAlpha(200);
         c.drawText(label, rect.left + sw * 0.05f, cy, labelPaint);
         valuePaint.setTextAlign(Paint.Align.RIGHT);
-        valuePaint.setColor(valueColor);
+        valuePaint.setColor(valueColor); valuePaint.setAlpha(255);
         c.drawText(value, rect.right - sw * 0.05f, cy, valuePaint);
     }
 
     private void drawButton(Canvas c, RectF rect, String text, int accentColor) {
         float rad = rect.height() * 0.45f;
         c.drawRoundRect(rect, rad, rad, btnPaint);
-        btnOutlinePaint.setColor(accentColor); btnOutlinePaint.setAlpha(140);
+        btnOutlinePaint.setColor(accentColor);
         c.drawRoundRect(rect, rad, rad, btnOutlinePaint);
         btnTextPaint.setColor(WHITE);
         c.drawText(text, rect.centerX(), rect.centerY() + sw * 0.014f, btnTextPaint);
@@ -341,5 +456,9 @@ public class UIOverlay {
     public boolean isDiffHit(float x, float y) { return diffBtn.contains(x, y); }
     public boolean isSoundHit(float x, float y) { return soundBtn.contains(x, y); }
     public boolean isVibHit(float x, float y) { return vibBtn.contains(x, y); }
-    public boolean isRestartHit(float x, float y) { return restartBtn.contains(x, y); }
+    public boolean isRestartHit(float x, float y) {
+        if (gameOverTime > 0 && System.currentTimeMillis() - gameOverTime < BUTTON_DELAY)
+            return false;
+        return restartBtn.contains(x, y);
+    }
 }

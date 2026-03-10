@@ -11,7 +11,8 @@ import com.stellardrift.game.util.Constants;
 
 public class Player {
 
-    private float x, y, size;
+    private float x, y, size, prevX;
+    private float bankAngle, targetBank;
     private int screenW, screenH;
     private float glowPulse, engineFlicker;
 
@@ -30,6 +31,11 @@ public class Player {
     private int shieldTimer;
     private float shieldPulse;
 
+    // Overdrive
+    private boolean overdrive;
+    private int overdriveTimer;
+    private float overdrivePulse;
+
     private static final int CYAN = Color.parseColor("#00E5FF");
     private static final int DEEP_BLUE = Color.parseColor("#1A237E");
     private static final int PURPLE = Color.parseColor("#7C4DFF");
@@ -40,6 +46,8 @@ public class Player {
         screenW = sw; screenH = sh;
         size = sw * Constants.PLAYER_SIZE_RATIO;
         x = sw / 2f; y = sh * 0.82f;
+        prevX = x;
+        bankAngle = 0; targetBank = 0;
 
         trailX = new float[TRAIL_LEN];
         trailY = new float[TRAIL_LEN];
@@ -80,11 +88,18 @@ public class Player {
     }
 
     public void update(float touchX, boolean touching) {
-        // Parmağı doğrudan takip et — çok daha kolay kontrol
+        prevX = x;
         if (touching && touchX >= 0) {
             float target = Math.max(size, Math.min(screenW - size, touchX));
             x += (target - x) * Constants.PLAYER_FOLLOW_SPEED;
         }
+
+        // Banking
+        float dx = x - prevX;
+        targetBank = Math.max(-Constants.PLAYER_MAX_BANK_ANGLE,
+            Math.min(Constants.PLAYER_MAX_BANK_ANGLE,
+                dx * 2.5f));
+        bankAngle += (targetBank - bankAngle) * Constants.PLAYER_BANK_SPEED;
 
         trailIdx = (trailIdx + 1) % TRAIL_LEN;
         trailX[trailIdx] = x; trailY[trailIdx] = y;
@@ -95,34 +110,61 @@ public class Player {
             shieldTimer--; shieldPulse += 0.15f;
             if (shieldTimer <= 0) shielded = false;
         }
+        if (overdrive) {
+            overdriveTimer--; overdrivePulse += 0.12f;
+            if (overdriveTimer <= 0) overdrive = false;
+        }
     }
 
     public void render(Canvas c) {
-        renderTrail(c); renderGlow(c); renderEngine(c);
-        buildShip(); renderShip(c); renderDetails(c);
+        renderTrail(c);
+        renderGlow(c);
+
+        c.save();
+        c.rotate(bankAngle, x, y);
+
+        renderEngine(c);
+        buildShip();
+        renderShip(c);
+        renderDetails(c);
+
+        c.restore();
+
+        if (overdrive) renderOverdrive(c);
         if (shielded) renderShield(c);
     }
 
     private void renderTrail(Canvas c) {
-        for (int i = 0; i < TRAIL_LEN; i++) {
+        int trailLen = overdrive ? TRAIL_LEN : TRAIL_LEN;
+        for (int i = 0; i < trailLen; i++) {
             int idx = (trailIdx - i + TRAIL_LEN) % TRAIL_LEN;
             float a = 1f - (i / (float) TRAIL_LEN);
-            trailPaint.setAlpha((int)(35 * a));
-            c.drawCircle(trailX[idx], trailY[idx] + size * 0.5f, size * 0.2f * a, trailPaint);
+            if (overdrive) {
+                trailPaint.setColor(0xFFFF6D00);
+                trailPaint.setAlpha((int)(55 * a));
+                c.drawCircle(trailX[idx], trailY[idx] + size * 0.5f, size * 0.3f * a, trailPaint);
+                trailPaint.setColor(CYAN);
+            } else {
+                trailPaint.setAlpha((int)(35 * a));
+                c.drawCircle(trailX[idx], trailY[idx] + size * 0.5f, size * 0.2f * a, trailPaint);
+            }
         }
     }
 
     private void renderGlow(Canvas c) {
         float p = (float)(Math.sin(glowPulse) * 0.15 + 0.85);
+        int glowColor = overdrive ? 0xFFFF6D00 : CYAN;
+        glowPaint.setColor(glowColor);
         for (int i = 6; i >= 0; i--) {
             float f = (float) i / 6;
-            glowPaint.setAlpha((int)(10 * (1f - f)));
+            glowPaint.setAlpha((int)((overdrive ? 15 : 10) * (1f - f)));
             c.drawCircle(x, y, size * (1.3f + f * 1.8f) * p, glowPaint);
         }
     }
 
     private void renderEngine(Canvas c) {
         float s = size, len = s * (0.7f + engineFlicker * 0.4f);
+        if (overdrive) len *= 1.4f;
         drawFlame(c, x - s*0.18f, y + s*0.4f, s*0.09f, len*0.75f);
         drawFlame(c, x + s*0.18f, y + s*0.4f, s*0.09f, len*0.75f);
         drawFlame(c, x, y + s*0.35f, s*0.13f, len);
@@ -159,11 +201,15 @@ public class Player {
     }
 
     private void renderShip(Canvas c) {
+        int topCol = overdrive ? 0xFF4A148C : DEEP_BLUE;
+        int botCol = overdrive ? 0xFFFF6D00 : PURPLE;
         shipPaint.setShader(new LinearGradient(
             x, y - size*1.3f, x, y + size*0.5f,
-            DEEP_BLUE, PURPLE, Shader.TileMode.CLAMP));
+            topCol, botCol, Shader.TileMode.CLAMP));
         c.drawPath(shipPath, shipPaint);
         shipPaint.setShader(null);
+        int outCol = overdrive ? 0xFFFF6D00 : CYAN;
+        outlinePaint.setColor(outCol); outlinePaint.setAlpha(180);
         c.drawPath(shipPath, outlinePaint);
     }
 
@@ -186,6 +232,17 @@ public class Player {
         c.drawPath(wingR, wingPaint);
     }
 
+    private void renderOverdrive(Canvas c) {
+        float p = (float)(Math.sin(overdrivePulse) * 0.15 + 0.85);
+        float r = size * 1.6f * p;
+        for (int i = 3; i >= 0; i--) {
+            glowPaint.setColor(0xFFFF6D00);
+            glowPaint.setAlpha(30 - i * 7);
+            c.drawCircle(x, y, r + i * 4, glowPaint);
+        }
+        glowPaint.setColor(CYAN);
+    }
+
     private void renderShield(Canvas c) {
         float p = (float)(Math.sin(shieldPulse) * 0.1 + 0.9);
         float r = size * 1.5f * p;
@@ -199,9 +256,15 @@ public class Player {
     public float getY() { return y; }
     public float getSize() { return size; }
     public boolean isShielded() { return shielded; }
+    public boolean isOverdrive() { return overdrive; }
 
     public void activateShield(int dur) {
         shielded = true; shieldTimer = dur; shieldPulse = 0;
+    }
+    public void activateOverdrive() {
+        overdrive = true;
+        overdriveTimer = Constants.OVERDRIVE_DURATION;
+        overdrivePulse = 0;
     }
 
     public RectF getBounds() {
@@ -211,8 +274,10 @@ public class Player {
     }
 
     public void reset() {
-        x = screenW / 2f;
+        x = screenW / 2f; prevX = x;
+        bankAngle = 0; targetBank = 0;
         shielded = false; shieldTimer = 0;
+        overdrive = false; overdriveTimer = 0;
         for (int i = 0; i < TRAIL_LEN; i++) { trailX[i] = x; trailY[i] = y; }
     }
 }

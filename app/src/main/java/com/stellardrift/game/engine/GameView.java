@@ -3,6 +3,9 @@ package com.stellardrift.game.engine;
 import android.content.Context;
 import android.graphics.Canvas;
 import android.graphics.Color;
+import android.graphics.Paint;
+import android.graphics.RadialGradient;
+import android.graphics.Shader;
 import android.view.MotionEvent;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
@@ -24,10 +27,19 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback {
     private float touchX = -1;
     private boolean touching = false;
 
+    private Paint vignettePaint;
+    private RadialGradient vignetteNormal, vignetteDanger;
+    private float currentDanger;
+    private Paint riskBorderPaint;
+
     public GameView(Context context) {
         super(context);
         getHolder().addCallback(this);
         setFocusable(true);
+        vignettePaint = new Paint();
+        riskBorderPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        riskBorderPaint.setStyle(Paint.Style.STROKE);
+        riskBorderPaint.setColor(0xFFFFD740);
     }
 
     @Override
@@ -37,16 +49,26 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback {
         if (gameWorld == null) gameWorld = new GameWorld(screenW, screenH, getContext());
         if (renderer == null) renderer = new Renderer();
         if (uiOverlay == null) uiOverlay = new UIOverlay(screenW, screenH);
+        initVignette();
         startLoop(holder);
     }
 
     @Override
-    public void surfaceChanged(SurfaceHolder h, int f, int w, int h2) {
-        screenW = w; screenH = h2;
-    }
+    public void surfaceChanged(SurfaceHolder h, int f, int w, int h2) { screenW = w; screenH = h2; }
 
     @Override
     public void surfaceDestroyed(SurfaceHolder holder) { stopLoop(); }
+
+    private void initVignette() {
+        float cx = screenW / 2f, cy = screenH / 2f;
+        float radius = (float) Math.hypot(cx, cy);
+        vignetteNormal = new RadialGradient(cx, cy, radius,
+            new int[]{0x00000000, 0x00000000, 0x40000000},
+            new float[]{0f, 0.6f, 1f}, Shader.TileMode.CLAMP);
+        vignetteDanger = new RadialGradient(cx, cy, radius,
+            new int[]{0x00000000, 0x00000000, 0x60FF0000},
+            new float[]{0f, 0.5f, 1f}, Shader.TileMode.CLAMP);
+    }
 
     private void startLoop(SurfaceHolder holder) {
         if (gameLoop == null || !gameLoop.isRunning()) {
@@ -95,7 +117,10 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback {
         int state = gameWorld.getState();
 
         if (state == Constants.STATE_MENU) {
-            if (uiOverlay.isPlayHit(x, y)) gameWorld.startGame();
+            if (uiOverlay.isPlayHit(x, y)) {
+                uiOverlay.resetGameOver();
+                gameWorld.startGame();
+            }
             else if (uiOverlay.isSettingsHit(x, y)) gameWorld.openSettings();
         } else if (state == Constants.STATE_SETTINGS) {
             if (uiOverlay.isDiffHit(x, y)) gameWorld.cycleDifficulty();
@@ -103,14 +128,19 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback {
             else if (uiOverlay.isVibHit(x, y)) gameWorld.toggleVibration();
             else if (uiOverlay.isBackHit(x, y)) gameWorld.closeSettings();
         } else if (state == Constants.STATE_GAME_OVER) {
-            if (uiOverlay.isRestartHit(x, y)) gameWorld.startGame();
-            else gameWorld.handleTap();
+            if (uiOverlay.isRestartHit(x, y)) {
+                uiOverlay.resetGameOver();
+                gameWorld.startGame();
+            } else {
+                gameWorld.handleTap();
+                uiOverlay.resetGameOver();
+            }
         }
     }
 
     public void updateGame() {
-        if (background != null)
-            background.update(gameWorld != null ? gameWorld.getDifficulty() : 1f);
+        if (background != null && gameWorld != null)
+            background.update(gameWorld.getDifficulty(), gameWorld.getTempoPhase());
         if (gameWorld != null)
             gameWorld.update(touchX, touching);
     }
@@ -119,12 +149,8 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback {
         if (canvas == null) return;
         canvas.drawColor(Color.parseColor("#050510"));
 
-        // Screen shake
         float sx = 0, sy = 0;
-        if (gameWorld != null) {
-            sx = gameWorld.getShakeX();
-            sy = gameWorld.getShakeY();
-        }
+        if (gameWorld != null) { sx = gameWorld.getShakeX(); sy = gameWorld.getShakeY(); }
         if (sx != 0 || sy != 0) canvas.translate(sx, sy);
 
         if (background != null) background.render(canvas);
@@ -132,7 +158,43 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback {
 
         if (sx != 0 || sy != 0) canvas.translate(-sx, -sy);
 
+        drawVignette(canvas);
+        drawRiskBorder(canvas);
+
         if (uiOverlay != null && gameWorld != null)
             uiOverlay.renderFull(canvas, gameWorld);
+    }
+
+    private void drawVignette(Canvas canvas) {
+        if (gameWorld == null || gameWorld.getState() != Constants.STATE_PLAYING) {
+            vignettePaint.setShader(vignetteNormal);
+            vignettePaint.setAlpha(255);
+            canvas.drawRect(0, 0, screenW, screenH, vignettePaint);
+            return;
+        }
+        float danger = gameWorld.getDangerLevel();
+        currentDanger += (danger - currentDanger) * 0.1f;
+        if (currentDanger > 0.3f) {
+            vignettePaint.setShader(vignetteDanger);
+            vignettePaint.setAlpha((int)(currentDanger * 255));
+        } else {
+            vignettePaint.setShader(vignetteNormal);
+            vignettePaint.setAlpha(255);
+        }
+        canvas.drawRect(0, 0, screenW, screenH, vignettePaint);
+    }
+
+    private void drawRiskBorder(Canvas canvas) {
+        if (gameWorld == null || !gameWorld.isRiskWindowActive()) return;
+        float timer = gameWorld.getRiskWindowTimer();
+        float progress = timer / (float) Constants.RISK_WINDOW_DURATION;
+        float blink = progress < 0.25f ? (float)(Math.sin(timer * 0.5) * 0.4 + 0.6) : 1f;
+        int alpha = (int)(120 * progress * blink);
+        riskBorderPaint.setAlpha(alpha);
+        riskBorderPaint.setStrokeWidth(3f);
+        canvas.drawLine(0, 0, screenW, 0, riskBorderPaint);
+        canvas.drawLine(0, screenH, screenW, screenH, riskBorderPaint);
+        canvas.drawLine(0, 0, 0, screenH, riskBorderPaint);
+        canvas.drawLine(screenW, 0, screenW, screenH, riskBorderPaint);
     }
 }

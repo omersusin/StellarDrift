@@ -17,12 +17,19 @@ public final class Constants {
 
     public static final float PLAYER_SIZE_RATIO = 0.07f;
     public static final float PLAYER_FOLLOW_SPEED = 0.25f;
+    public static final float PLAYER_MAX_BANK_ANGLE = 12f;
+    public static final float PLAYER_BANK_SPEED = 0.15f;
 
     public static final float ASTEROID_MIN_SPEED = 3f;
     public static final float ASTEROID_MAX_SPEED = 8f;
     public static final int ASTEROID_SPAWN_INTERVAL = 25;
     public static final float ASTEROID_MIN_SIZE = 0.035f;
     public static final float ASTEROID_MAX_SIZE = 0.08f;
+    public static final int ASTEROID_FADEIN_FRAMES = 15;
+    public static final float ASTEROID_SAFE_ZONE = 0.15f;
+    public static final float ASTEROID_SINE_CHANCE = 0.3f;
+    public static final float ASTEROID_SINE_AMP = 0.04f;
+    public static final float ASTEROID_SINE_FREQ = 0.03f;
 
     public static final float STARDUST_SPEED = 4f;
     public static final int STARDUST_SPAWN_INTERVAL = 40;
@@ -57,10 +64,28 @@ public final class Constants {
     public static final int COMBO_TIMEOUT = 120;
     public static final float COMBO_MULTIPLIER = 0.2f;
 
-    // Near-miss düzeltildi
     public static final int NEAR_MISS_BONUS = 5;
     public static final float NEAR_MISS_RANGE = 1.25f;
     public static final int NEAR_MISS_COOLDOWN = 90;
+
+    // Risk window
+    public static final int RISK_WINDOW_DURATION = 120;
+    public static final float RISK_WINDOW_MULT = 1.5f;
+
+    // Tempo wave
+    public static final int TEMPO_CALM = 0;
+    public static final int TEMPO_PRESSURE = 1;
+    public static final int TEMPO_REWARD = 2;
+    public static final int TEMPO_CALM_DURATION = 400;
+    public static final int TEMPO_PRESSURE_DURATION = 250;
+    public static final int TEMPO_REWARD_DURATION = 200;
+
+    // Overdrive
+    public static final int OVERDRIVE_COMBO_THRESHOLD = 8;
+    public static final int OVERDRIVE_DURATION = 180;
+
+    // Freeze frame
+    public static final int FREEZE_FRAMES = 8;
 
     public static final int WARMUP_FRAMES = 180;
 
