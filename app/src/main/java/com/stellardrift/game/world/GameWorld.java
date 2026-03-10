@@ -29,22 +29,17 @@ public class GameWorld {
     private SoundManager sound;
     private VibrationManager vibration;
 
-    // Combo
     private int combo;
     private int comboTimer;
 
-    // Near-miss
-    private boolean nearMissFrame;
+    private int nearMissCooldown;
 
-    // Power-up states
     private boolean magnetActive, slowmoActive, doubleActive;
     private int magnetTimer, slowmoTimer, doubleTimer;
     private int powerUpSpawnTimer;
 
-    // Screen shake
     private float shakeX, shakeY, shakeIntensity;
 
-    // Stats for death screen
     private int orbsCollected, nearMissCount, maxCombo;
     private long startTime;
 
@@ -68,10 +63,10 @@ public class GameWorld {
         score = 0;
         difficulty = 1f;
         frameCount = 0;
+        nearMissCooldown = 0;
     }
 
     public void update(float touchX, boolean touching) {
-        // Update popups always (even game over)
         Iterator<ScorePopup> pi2 = popups.iterator();
         while (pi2.hasNext()) {
             ScorePopup sp = pi2.next();
@@ -79,7 +74,6 @@ public class GameWorld {
             if (!sp.isAlive()) pi2.remove();
         }
 
-        // Update shake always
         if (shakeIntensity > 0.3f) {
             shakeX = (float)(Math.random() * shakeIntensity * 2 - shakeIntensity);
             shakeY = (float)(Math.random() * shakeIntensity * 2 - shakeIntensity);
@@ -91,25 +85,23 @@ public class GameWorld {
         if (state != Constants.STATE_PLAYING) return;
 
         frameCount++;
-        nearMissFrame = false;
         float speedMult = settings.getSpeedMultiplier();
         difficulty = Math.min(Constants.MAX_DIFFICULTY,
             1f + frameCount * Constants.DIFFICULTY_RATE);
 
         player.update(touchX, touching);
 
-        // Combo timer
+        if (nearMissCooldown > 0) nearMissCooldown--;
+
         if (combo > 0) {
             comboTimer--;
-            if (comboTimer <= 0) { combo = 0; }
+            if (comboTimer <= 0) combo = 0;
         }
 
-        // Power-up timers
         if (magnetActive) { magnetTimer--; if (magnetTimer <= 0) magnetActive = false; }
         if (slowmoActive) { slowmoTimer--; if (slowmoTimer <= 0) slowmoActive = false; }
         if (doubleActive) { doubleTimer--; if (doubleTimer <= 0) doubleActive = false; }
 
-        // Spawning (skip warmup for asteroids)
         boolean warmup = frameCount < Constants.WARMUP_FRAMES;
         int spawnInt = settings.getSpawnInterval();
 
@@ -119,7 +111,6 @@ public class GameWorld {
         if (frameCount % Math.max(10, (int)(Constants.STARDUST_SPAWN_INTERVAL / difficulty)) == 0)
             starDusts.add(new StarDust(screenW, screenH));
 
-        // Power-up spawn
         powerUpSpawnTimer++;
         if (powerUpSpawnTimer >= Constants.POWERUP_SPAWN_INTERVAL) {
             powerUpSpawnTimer = 0;
@@ -127,7 +118,6 @@ public class GameWorld {
             powerUps.add(new PowerUp(screenW, screenH, type));
         }
 
-        // Effective speed
         float effDiff = difficulty * speedMult;
         if (slowmoActive) effDiff *= Constants.SLOWMO_FACTOR;
 
@@ -142,7 +132,6 @@ public class GameWorld {
             if (!p.isAlive()) pi.remove();
         }
 
-        // Magnet pull
         if (magnetActive) {
             float range = screenW * Constants.MAGNET_RANGE;
             float px = player.getX(), py = player.getY();
@@ -164,7 +153,6 @@ public class GameWorld {
         RectF pb = player.getBounds();
         float px = player.getX(), py = player.getY();
 
-        // StarDust collection
         Iterator<StarDust> si = starDusts.iterator();
         while (si.hasNext()) {
             StarDust s = si.next();
@@ -190,7 +178,6 @@ public class GameWorld {
             }
         }
 
-        // Power-up collection
         Iterator<PowerUp> pui = powerUps.iterator();
         while (pui.hasNext()) {
             PowerUp pu = pui.next();
@@ -208,12 +195,8 @@ public class GameWorld {
 
         if (player.isShielded()) return;
 
-        // Asteroid collision + near-miss
-        Iterator<Asteroid> ai = asteroids.iterator();
-        while (ai.hasNext()) {
-            Asteroid a = ai.next();
+        for (Asteroid a : asteroids) {
             if (RectF.intersects(pb, a.getBounds())) {
-                // Death
                 spawnParticles(px, py,
                     Constants.EXPLOSION_PARTICLES, 0xFFFF1744);
                 spawnParticles(a.getX(), a.getY(),
@@ -225,19 +208,19 @@ public class GameWorld {
                 return;
             }
 
-            // Near-miss check
-            if (!nearMissFrame) {
+            // Near-miss — cooldown ile kontrol
+            if (nearMissCooldown <= 0) {
                 float dx = px - a.getX();
                 float dy = py - a.getY();
                 float dist = (float) Math.sqrt(dx * dx + dy * dy);
                 float threshold = (player.getSize() + a.getSize()) * Constants.NEAR_MISS_RANGE;
                 float hitDist = (player.getSize() + a.getSize()) * 0.65f;
                 if (dist < threshold && dist > hitDist) {
-                    nearMissFrame = true;
+                    nearMissCooldown = Constants.NEAR_MISS_COOLDOWN;
                     nearMissCount++;
                     score += Constants.NEAR_MISS_BONUS;
                     popups.add(ScorePopup.createNearMiss(px, py));
-                    spawnParticles(px, py, 8, 0xFF00E5FF);
+                    break;
                 }
             }
         }
@@ -319,7 +302,7 @@ public class GameWorld {
     public void startGame() {
         state = Constants.STATE_PLAYING;
         score = 0; difficulty = 1f; frameCount = 0;
-        combo = 0; comboTimer = 0;
+        combo = 0; comboTimer = 0; nearMissCooldown = 0;
         magnetActive = false; slowmoActive = false; doubleActive = false;
         magnetTimer = 0; slowmoTimer = 0; doubleTimer = 0;
         powerUpSpawnTimer = 0;
@@ -345,7 +328,6 @@ public class GameWorld {
         vibration.vibrateClick();
     }
 
-    // Getters
     public int getState() { return state; }
     public int getScore() { return score; }
     public int getHighScore() { return settings.getHighScore(); }
@@ -357,7 +339,6 @@ public class GameWorld {
     public List<PowerUp> getPowerUps() { return powerUps; }
     public List<ScorePopup> getPopups() { return popups; }
     public SettingsManager getSettings() { return settings; }
-
     public int getCombo() { return combo; }
     public int getComboTimer() { return comboTimer; }
     public boolean isMagnetActive() { return magnetActive; }
@@ -368,7 +349,6 @@ public class GameWorld {
     public int getDoubleTimer() { return doubleTimer; }
     public float getShakeX() { return shakeX; }
     public float getShakeY() { return shakeY; }
-
     public int getOrbsCollected() { return orbsCollected; }
     public int getNearMissCount() { return nearMissCount; }
     public int getMaxCombo() { return maxCombo; }
@@ -376,7 +356,6 @@ public class GameWorld {
         if (startTime == 0) return 0;
         return (System.currentTimeMillis() - startTime) / 1000;
     }
-
     public void releaseResources() {
         if (sound != null) sound.release();
     }
