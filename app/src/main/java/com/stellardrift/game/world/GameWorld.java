@@ -51,11 +51,11 @@ public class GameWorld {
     private List<float[]> spawnWarnings;
     private List<float[]> nearMissFlashes;
 
-    // Graze Chain
+    // Masterpiece: Graze Chain
     private int grazeChainCount;
     private int grazeChainTimer;
 
-    // Ring Bursts
+    // Masterpiece: Ring Bursts
     private List<float[]> ringBursts; // x, y, dirX, dirY, speed, life, color
 
     private int chainCounter;
@@ -110,7 +110,7 @@ public class GameWorld {
 
         player.update(joyDirX, joyDirY, joyMag);
         
-        // Combo bilgilerini yolla
+        // Pass combo info to player for Combo Arc
         float comboProg = comboTimer > 0 ? (float)comboTimer / Constants.COMBO_TIMEOUT : 0f;
         player.setComboInfo(combo, comboProg);
         
@@ -123,7 +123,7 @@ public class GameWorld {
         float effDiff = getEffectiveDifficulty(speedMult, gameSpeedMult);
         moveEntities(effDiff);
         
-        // StarDust Magnet (Hem Power-Up hem Doğal)
+        // Masterpiece: Natural Snap Magnet
         applyStarDustMagnet();
         
         checkCollisions();
@@ -161,14 +161,15 @@ public class GameWorld {
         while (it.hasNext()) { float[] f = it.next(); f[4]--; if (f[4] <= 0) it.remove(); }
     }
     
+    // Masterpiece: Ring Burst Update
     private void updateRingBursts() {
         Iterator<float[]> it = ringBursts.iterator();
         while (it.hasNext()) { 
             float[] b = it.next(); 
             b[0] += b[2] * b[4] * 0.016f; // x += dirX * speed * dt
             b[1] += b[3] * b[4] * 0.016f; // y += dirY * speed * dt
-            b[4] *= 0.92f; // Yavaşla
-            b[5] -= 0.016f * 5f; // Life azalır (~200ms)
+            b[4] *= 0.92f; // Slow down
+            b[5] -= 0.016f * 5f; // Life decreases (~200ms)
             if (b[5] <= 0) it.remove(); 
         }
     }
@@ -262,6 +263,7 @@ public class GameWorld {
         while (pi.hasNext()) { Particle p = pi.next(); p.update(); if (!p.isAlive()) pi.remove(); }
     }
 
+    // Masterpiece: Natural Snap Magnet
     private void applyStarDustMagnet() {
         float px = player.getX(), py = player.getY();
         for (StarDust s : starDusts) {
@@ -300,6 +302,7 @@ public class GameWorld {
         }
     }
 
+    // Masterpiece: Ring Burst Spawner
     private void spawnRingBurst(float x, float y, int color) {
         int count = 7;
         float angleStep = (float)(2 * Math.PI / count);
@@ -334,14 +337,14 @@ public class GameWorld {
         }
 
         popups.add(ScorePopup.createCollect(s.getX(), s.getY(), fp, cm));
-        spawnRingBurst(s.getX(), s.getY(), 0xFFFFD740); // Ring Burst eklendi
+        spawnRingBurst(s.getX(), s.getY(), 0xFFFFD740); // Ring Burst Effect
         sound.playCollect(); vibration.vibrateCollect();
     }
 
     private void collectPowerUp(PowerUp pu) {
         activatePowerUp(pu.getType());
         popups.add(ScorePopup.createPowerUp(pu.getX(), pu.getY(), pu.getType()));
-        spawnRingBurst(pu.getX(), pu.getY(), PowerUp.getColor(pu.getType())); // Ring Burst
+        spawnRingBurst(pu.getX(), pu.getY(), PowerUp.getColor(pu.getType())); // Ring Burst Effect
         sound.playCollect(); vibration.vibrateCollect();
     }
 
@@ -354,15 +357,14 @@ public class GameWorld {
         }
     }
 
+    // Masterpiece: Graze Chain
     private void onNearMiss(float px, float py, float ax, float ay) {
         nearMissCooldown = Constants.NEAR_MISS_COOLDOWN; nearMissCount++;
         if (!firstNearMiss) firstNearMiss = true;
         
-        // Graze Chain Logic
         grazeChainCount++;
         grazeChainTimer = Constants.GRAZE_CHAIN_WINDOW;
         
-        // Katlanarak artan puan
         int grazePoints = Constants.NEAR_MISS_BONUS * (1 << (Math.min(grazeChainCount, 6) - 1));
         if (riskWindowActive) grazePoints = (int)(grazePoints * Constants.RISK_WINDOW_MULT);
         score += grazePoints;
@@ -384,7 +386,6 @@ public class GameWorld {
         riskWindowActive = true; riskWindowTimer = Constants.RISK_WINDOW_DURATION;
         nearMissFlashes.add(new float[]{px, py, ax, ay, Constants.NEAR_MISS_FLASH_LIFE});
         
-        // Daha güçlü titreşim
         if (grazeChainCount > 1) vibration.vibrateExplosion(); 
     }
 
