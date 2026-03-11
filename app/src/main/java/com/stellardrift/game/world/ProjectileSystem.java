@@ -40,6 +40,13 @@ public class ProjectileSystem {
     private final Projectile[] pool = new Projectile[POOL_SIZE];
     private int cursor = 0;
     private float fireTimer = 0f;
+    
+    // EKSIK OLAN FIELD VE METHOD BURADA
+    private int damageOverride = -1;
+
+    public void setDamageOverride(int damage) {
+        this.damageOverride = damage;
+    }
 
     static final int MAX_FLASHES = 8;
     final float[] flashX = new float[MAX_FLASHES], flashY = new float[MAX_FLASHES], flashLife = new float[MAX_FLASHES]; 
@@ -56,11 +63,10 @@ public class ProjectileSystem {
         projPaint.setStyle(Paint.Style.FILL); trailPaint.setStyle(Paint.Style.STROKE); trailPaint.setStrokeCap(Paint.Cap.ROUND); flashPaint.setStyle(Paint.Style.FILL);
     }
 
-    // ── DEĞİŞİKLİK: fireRateMultiplier eklendi (Overcharge için) ──
     public float autoFire(float dt, float shipX, float shipY, float bankAngle, ShipData ship, float fireRateMultiplier) {
         fireTimer += dt;
         
-        float effectiveFireRate = ship.fireRate * fireRateMultiplier;
+        float effectiveFireRate = ship.baseFireRate * fireRateMultiplier;
         float fireInterval = 1f / effectiveFireRate;
         float recoilAmount = 0f;
 
@@ -68,9 +74,12 @@ public class ProjectileSystem {
             fireTimer -= fireInterval;
             
             float speedBoost = (fireRateMultiplier > 1.5f) ? 1.3f : 1.0f;
-            float baseSpeed = -800f * (screenHeight / 1920f) * ship.projectileSpeed * speedBoost; 
+            float baseSpeed = -800f * (screenHeight / 1920f) * ship.baseProjectileSpeed * speedBoost; 
 
             float scale = (screenWidth / 1080f) * 2.5f;
+
+            // Damage Override (Upgrade edildiyse kullanir)
+            int effectiveDamage = (damageOverride > 0) ? damageOverride : ship.baseDamage;
 
             for (int w = 0; w < ship.projectileCount; w++) {
                 float rad = (float) Math.toRadians(bankAngle);
@@ -81,7 +90,6 @@ public class ProjectileSystem {
                 float worldX = shipX + localX * cos - localY * sin;
                 float worldY = shipY + localX * sin + localY * cos;
                 
-                // ── YENİ: Overcharge Spread Efekti ──
                 float spreadX = 0f;
                 if (fireRateMultiplier > 1.5f) {
                     spreadX = (float)((Math.random() - 0.5) * 40);
@@ -99,13 +107,10 @@ public class ProjectileSystem {
                 }
 
                 Projectile p = pool[cursor]; cursor = (cursor + 1) % POOL_SIZE;
-                p.init(worldX, worldY, spreadX, baseSpeed, ship.damage, ship.projectileColor, pw, ph, ship.id);
+                p.init(worldX, worldY, spreadX, baseSpeed, effectiveDamage, ship.projectileColor, pw, ph, ship.id);
 
                 flashX[flashCursor] = worldX; flashY[flashCursor] = worldY; flashLife[flashCursor] = 1f; 
-                
-                // ── YENİ: Overcharge Mavi Parlama ──
                 flashColor[flashCursor] = (fireRateMultiplier > 1.5f) ? Color.rgb(60, 180, 255) : ship.projectileColor; 
-                
                 flashCursor = (flashCursor + 1) % MAX_FLASHES;
             }
             recoilAmount = 1.0f; 
@@ -128,7 +133,7 @@ public class ProjectileSystem {
         switch (p.shipType) {
             case ShipRegistry.STRIKER:
                 projPath.reset(); projPath.moveTo(p.x, p.y - p.height / 2); projPath.lineTo(p.x + p.width / 2, p.y); projPath.lineTo(p.x, p.y + p.height / 2); projPath.lineTo(p.x - p.width / 2, p.y); projPath.close();
-                canvas.drawPath(projPath, projPaint); projPaint.setColor(Color.argb(200, 255, 255, 255)); canvas.drawCircle(p.x, p.y, p.width * 0.4f, projPaint);
+                canvas.drawPath(projPath, projPaint); projPaint.setColor(Color.argb(200, 255, 255, 255)); canvas.drawCircle(p.x, p.y, 1.5f, projPaint);
                 break;
             case ShipRegistry.JUGGERNAUT:
                 canvas.drawRoundRect(p.x - p.width / 2, p.y - p.height / 2, p.x + p.width / 2, p.y + p.height / 2, 3f, 3f, projPaint);
