@@ -54,7 +54,11 @@ public class GameWorld {
     private int lastMilestone;
     private String milestoneText;
     private int milestoneTimer;
+    
+    // EKSIK OLAN FIELD BURADA:
     private float dangerLevel;
+    private float[] directionalDangers = new float[4]; 
+    
     private List<float[]> spawnWarnings;
     private List<float[]> nearMissFlashes;
 
@@ -94,6 +98,10 @@ public class GameWorld {
         nearMissFlashes = new ArrayList<>(); ringBursts = new ArrayList<>();
 
         state = Constants.STATE_MENU; tempoPhase = Constants.TEMPO_CALM; tempoTimer = Constants.TEMPO_CALM_DURATION; transitionAlpha = 0;
+        
+        // Initializing the directionalDangers array
+        directionalDangers[0] = 0f; directionalDangers[1] = 0f; 
+        directionalDangers[2] = 0f; directionalDangers[3] = 0f;
     }
 
     public void update(float joyDirX, float joyDirY, float joyMag) {
@@ -118,7 +126,7 @@ public class GameWorld {
         
         // Auto-Fire
         float recoil = projectiles.autoFire(dt, player.getX(), player.getY(), player.getBankAngle(), player.getShipData());
-        if (recoil > 0) { shakeIntensity = Math.max(shakeIntensity, recoil * 1.5f); } // Micro-shake for shooting
+        if (recoil > 0) { shakeIntensity = Math.max(shakeIntensity, recoil * 1.5f); }
         projectiles.update(dt);
 
         if (hitStallTimer <= 0) { updateTimers(); updateTempo(); handleSpawning(); updateSpawnWarnings(); }
@@ -133,6 +141,7 @@ public class GameWorld {
 
     private void updateCosmicBreath(float dt) { cosmicBreathTimer += dt; cosmicBreathValue = (float) Math.sin(cosmicBreathTimer * Math.PI * 2.0 / 4.0) * 0.5f + 0.5f; }
     private void updateSpawnBias(float dt, float dirX, float dirY, float mag) { if (mag > 0.2f) { float targetAngle = (float) Math.atan2(dirY, dirX); float diff = targetAngle - spawnBiasAngle; while (diff > Math.PI) diff -= 2 * Math.PI; while (diff < -Math.PI) diff += 2 * Math.PI; spawnBiasAngle += diff * Math.min(dt * 3f, 1f); } }
+    
     private void updateDirectionalDangers(float dt) {
         float tTop = 0, tBot = 0, tLeft = 0, tRight = 0, threatRadius = screenH * 0.4f;
         for (Asteroid a : asteroids) {
@@ -142,9 +151,14 @@ public class GameWorld {
             if (dy < -Math.abs(dx) * 0.5f) tTop = Math.max(tTop, intensity); if (dy > Math.abs(dx) * 0.5f) tBot = Math.max(tBot, intensity);
             if (dx < -Math.abs(dy) * 0.5f) tLeft = Math.max(tLeft, intensity); if (dx > Math.abs(dy) * 0.5f) tRight = Math.max(tRight, intensity);
         }
-        float smooth = dt * 6f; directionalDangers[0] += (tTop - directionalDangers[0]) * smooth; directionalDangers[1] += (tBot - directionalDangers[1]) * smooth; directionalDangers[2] += (tLeft - directionalDangers[2]) * smooth; directionalDangers[3] += (tRight - directionalDangers[3]) * smooth;
+        float smooth = dt * 6f; 
+        directionalDangers[0] += (tTop - directionalDangers[0]) * smooth; 
+        directionalDangers[1] += (tBot - directionalDangers[1]) * smooth; 
+        directionalDangers[2] += (tLeft - directionalDangers[2]) * smooth; 
+        directionalDangers[3] += (tRight - directionalDangers[3]) * smooth;
         dangerLevel = Math.max(Math.max(directionalDangers[0], directionalDangers[1]), Math.max(directionalDangers[2], directionalDangers[3]));
     }
+    
     private void updateTimers() {
         if (nearMissCooldown > 0) nearMissCooldown--; if (grazeChainTimer > 0) { grazeChainTimer--; if (grazeChainTimer <= 0) grazeChainCount = 0; }
         if (combo > 0) { comboTimer--; if (comboTimer <= 0) { combo = 0; overdriveTriggered = false; chainActive = false; } }
@@ -172,6 +186,7 @@ public class GameWorld {
     private float getTempoSpawnMult() { return tempoPhase == Constants.TEMPO_PRESSURE ? 1.8f : tempoPhase == Constants.TEMPO_REWARD ? 0.3f : 1f; }
     private float getTempoStarDustMult() { return tempoPhase == Constants.TEMPO_REWARD ? 3f : 1f; }
     private float getTempoSpeedMult() { return tempoPhase == Constants.TEMPO_PRESSURE ? 1.15f : 1f; }
+
     private void handleSpawning() {
         boolean warmup = frameCount < Constants.WARMUP_FRAMES; int baseSpawn = settings.getSpawnInterval(); float tMult = getTempoSpawnMult();
         if (!warmup && !isGodMode) { int astInt = Math.max(5, (int)(baseSpawn / (difficulty * tMult))); if (frameCount % astInt == 0) { Asteroid a = new Asteroid(screenW, screenH, player.getX()); asteroids.add(a); spawnWarnings.add(new float[]{a.getX(), 20}); } }
@@ -193,7 +208,10 @@ public class GameWorld {
     }
     private void updateSpawnWarnings() { Iterator<float[]> it = spawnWarnings.iterator(); while (it.hasNext()) { float[] w = it.next(); w[1]--; if (w[1] <= 0) it.remove(); } }
     private float getEffectiveDifficulty(float speedMult, float gameSpeedMult) { float eff = difficulty * speedMult * gameSpeedMult * getTempoSpeedMult(); if (slowmoActive) eff *= Constants.SLOWMO_FACTOR; return eff; }
-    private void moveEntities(float effDiff) { for (Asteroid a : asteroids) a.update(effDiff); for (StarDust s : starDusts) s.update(effDiff); for (PowerUp p : powerUps) p.update(effDiff); Iterator<Particle> pi = particles.iterator(); while (pi.hasNext()) { Particle p = pi.next(); p.update(); if (!p.isAlive()) pi.remove(); } }
+    private void moveEntities(float effDiff) {
+        for (Asteroid a : asteroids) a.update(effDiff); for (StarDust s : starDusts) s.update(effDiff); for (PowerUp p : powerUps) p.update(effDiff);
+        Iterator<Particle> pi = particles.iterator(); while (pi.hasNext()) { Particle p = pi.next(); p.update(); if (!p.isAlive()) pi.remove(); }
+    }
     private void applyStarDustMagnet() { float px = player.getX(), py = player.getY(); for (StarDust s : starDusts) s.applyMagnet(px, py, screenW, magnetActive); }
 
     private void checkCollisions() {
@@ -206,21 +224,20 @@ public class GameWorld {
             @Override
             public void onAsteroidHit(Asteroid asteroid) {
                 spawnParticles(asteroid.getX(), asteroid.getY(), 3, Color.WHITE);
-                sound.playExplosion(); // Hafif ses
+                sound.playExplosion();
             }
 
             @Override
             public void onAsteroidDestroyed(Asteroid asteroid) {
-                spawnParticles(asteroid.getX(), asteroid.getY(), 15, Color.rgb(200, 180, 100)); // Kaya parçaları
-                spawnRingBurst(asteroid.getX(), asteroid.getY(), Color.rgb(255, 215, 0)); // Kredi patlaması
+                spawnParticles(asteroid.getX(), asteroid.getY(), 15, Color.rgb(200, 180, 100)); 
+                spawnRingBurst(asteroid.getX(), asteroid.getY(), Color.rgb(255, 215, 0)); 
                 popups.add(new ScorePopup(asteroid.getX(), asteroid.getY(), "+ " + asteroid.getCreditValue() + " CREDITS", Color.rgb(255, 215, 0), 1.2f));
                 sound.playExplosion();
                 vibration.vibrateExplosion();
-                score += 25; // Bonus skor
+                score += 25; 
             }
         });
 
-        // Çıkarılan ölü asteroitleri temizle
         Iterator<Asteroid> ai = asteroids.iterator();
         while (ai.hasNext()) { if (ai.next().isDead()) ai.remove(); }
 
@@ -259,9 +276,7 @@ public class GameWorld {
         orbsCollected = 0; nearMissCount = 0; maxCombo = 0; lastMilestone = 0; milestoneText = null; milestoneTimer = 0; dangerLevel = 0; tempoPhase = Constants.TEMPO_CALM; tempoTimer = Constants.TEMPO_CALM_DURATION;
         chainActive = false; chainCounter = 0; chainTarget = 0; firstStarDustSeen = false; firstNearMiss = false; transitionAlpha = 1f; transitioningIn = true; grazeChainCount = 0; grazeChainTimer = 0; hitStallTimer = 0f; spawnBiasAngle = 0f;
         startTime = System.currentTimeMillis(); asteroids.clear(); starDusts.clear(); particles.clear(); powerUps.clear(); popups.clear(); spawnWarnings.clear(); nearMissFlashes.clear(); ringBursts.clear(); player.reset();
-        
-        player.setShip(shipRegistry.getSelectedShip()); // Güncel gemiyi al
-        
+        player.setShip(shipRegistry.getSelectedShip()); 
         if (isGodMode) popups.add(new ScorePopup(screenW/2f, screenH/2f, "GOD MODE ENABLED", 0xFFFFD740, 2f));
     }
     public void pauseGame() { if (state == Constants.STATE_PLAYING) state = Constants.STATE_PAUSED; }
@@ -275,8 +290,5 @@ public class GameWorld {
     public void toggleVibration() { settings.toggleVibration(); vibration.setEnabled(settings.isVibrationEnabled()); vibration.vibrateClick(); if (isGodMode) { vibToggleClicks++; if (vibToggleClicks >= 5) { isGodMode = false; soundToggleClicks = 0; vibToggleClicks = 0; sound.playClick(); } } }
 
     public int getState() { return state; } public int getScore() { return score; } public int getHighScore() { return settings.getHighScore(); } public float getDifficulty() { return difficulty; } public Player getPlayer() { return player; } public List<Asteroid> getAsteroids() { return asteroids; } public List<StarDust> getStarDusts() { return starDusts; } public List<Particle> getParticles() { return particles; } public List<PowerUp> getPowerUps() { return powerUps; } public List<ScorePopup> getPopups() { return popups; } public SettingsManager getSettings() { return settings; } public int getCombo() { return combo; } public boolean isMagnetActive() { return magnetActive; } public boolean isSlowmoActive() { return slowmoActive; } public boolean isDoubleActive() { return doubleActive; } public int getMagnetTimer() { return magnetTimer; } public int getSlowmoTimer() { return slowmoTimer; } public int getDoubleTimer() { return doubleTimer; } public float getShakeX() { return shakeX; } public float getShakeY() { return shakeY; } public int getOrbsCollected() { return orbsCollected; } public int getNearMissCount() { return nearMissCount; } public int getMaxCombo() { return maxCombo; } public long getSurvivalTime() { return startTime == 0 ? 0 : (System.currentTimeMillis() - startTime) / 1000; } public int getTempoPhase() { return tempoPhase; } public boolean isRiskWindowActive() { return riskWindowActive; } public int getRiskWindowTimer() { return riskWindowTimer; } public boolean isFreezing() { return freezeTimer > 0; } public Asteroid getKillerAsteroid() { return killerAsteroid; } public boolean isShockwaveActive() { return shockwaveActive; } public float getShockwaveX() { return shockwaveX; } public float getShockwaveY() { return shockwaveY; } public float getShockwaveRadius() { return shockwaveRadius; } public float getShockwaveAlpha() { return shockwaveAlpha; } public float getDangerLevel() { return dangerLevel; } public float[] getDirectionalDangers() { return directionalDangers; } public String getMilestoneText() { return milestoneText; } public int getMilestoneTimer() { return milestoneTimer; } public List<float[]> getSpawnWarnings() { return spawnWarnings; } public List<float[]> getNearMissFlashes() { return nearMissFlashes; } public List<float[]> getRingBursts() { return ringBursts; } public float getTransitionAlpha() { return transitionAlpha; } public boolean isFirstStarDustSeen() { return firstStarDustSeen; } public boolean isFirstNearMiss() { return firstNearMiss; } public int getFrameCount() { return frameCount; } public float getCosmicBreath() { return cosmicBreathValue; } public void releaseResources() { if (sound != null) sound.release(); }
-    
-    public ProjectileSystem getProjectiles() { return projectiles; }
-    public ShipRegistry getShipRegistry() { return shipRegistry; }
-    public EconomyManager getEconomy() { return economy; }
+    public ProjectileSystem getProjectiles() { return projectiles; } public ShipRegistry getShipRegistry() { return shipRegistry; } public EconomyManager getEconomy() { return economy; }
 }
