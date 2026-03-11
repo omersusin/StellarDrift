@@ -26,7 +26,12 @@ public class VibrationManager {
 
     public void vibrateShoot() { vibrate(8, 40); }
     public void vibrateHit() { vibrate(15, 80); }
-    public void vibrateExplode() { vibrate(40, 180); }
+    
+    // ═════════════════════════════════════════════════
+    // EKSIK OLAN METOD BURADA EKLENDİ
+    // ═════════════════════════════════════════════════
+    public void vibrateExplosion() { vibratePattern(new long[]{0, 40, 30, 80, 20, 50}, new int[]{0, 200, 0, 255, 0, 180}); }
+    
     public void vibrateCollect() { vibrate(10, 50); }
     public void vibratePowerUp() { vibrate(25, 120); }
     public void vibrateOvercharge() { vibratePattern(new long[]{0, 30, 20, 50, 20, 30}, new int[]{0, 200, 0, 255, 0, 150}); }
