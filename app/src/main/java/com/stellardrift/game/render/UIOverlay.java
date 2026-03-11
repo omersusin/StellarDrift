@@ -65,6 +65,7 @@ public class UIOverlay {
         milestonePaint = makePaint(GOLD, sw * 0.06f, Paint.Align.CENTER, true);
         tempoPaint = makePaint(WHITE, sw * 0.02f, Paint.Align.RIGHT, false);
         riskPaint = makePaint(GOLD, sw * 0.025f, Paint.Align.CENTER, true);
+
         highScoreLinePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
         highScoreTextPaint = makePaint(GOLD, sw * 0.025f, Paint.Align.RIGHT, true);
 
@@ -84,6 +85,13 @@ public class UIOverlay {
     private Paint makePaint(int color, float size, Paint.Align align, boolean bold) {
         Paint p = new Paint(Paint.ANTI_ALIAS_FLAG); p.setColor(color); p.setTextSize(size); p.setTextAlign(align);
         if (bold) p.setTypeface(Typeface.DEFAULT_BOLD); return p;
+    }
+
+    // İŞTE EKSİK OLAN O METOD (HATA BURADAN KAYNAKLIYDI)
+    public void resetGameOver() { 
+        gameOverTime = 0; 
+        recordBroken = false;
+        recordBreakParticleTimer = 0;
     }
 
     public void renderFull(Canvas c, GameWorld world) {
@@ -119,8 +127,6 @@ public class UIOverlay {
             }
         }
     }
-
-    public void resetRecordBroken() { recordBroken = false; recordBreakParticleTimer = 0; }
 
     private void drawMenu(Canvas c, int highScore) {
         float p = (float)(Math.sin(pulse) * 0.08 + 0.92); float cx = sw / 2f;
