@@ -30,10 +30,16 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback {
 
     private int screenW, screenH;
 
+    private Paint vignettePaint, riskBorderPaint;
+    private RadialGradient vignetteNormal, vignetteDanger;
+    private float currentDanger;
+
     public GameView(Context context) {
         super(context);
         getHolder().addCallback(this);
         setFocusable(true);
+        vignettePaint = new Paint();
+        riskBorderPaint = new Paint(Paint.ANTI_ALIAS_FLAG); riskBorderPaint.setStyle(Paint.Style.STROKE); riskBorderPaint.setColor(0xFFFFD740);
     }
 
     @Override
@@ -45,11 +51,18 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback {
         if (shipRenderer == null) shipRenderer = new ShipRenderer();
         if (uiOverlay == null) uiOverlay = new UIOverlay(screenW, screenH);
         if (joystick == null) joystick = new Joystick(screenW);
+        initVignette();
         startLoop(holder);
     }
 
     @Override public void surfaceChanged(SurfaceHolder h, int f, int w, int h2) { screenW = w; screenH = h2; }
     @Override public void surfaceDestroyed(SurfaceHolder holder) { stopLoop(); }
+
+    private void initVignette() {
+        float cx = screenW / 2f, cy = screenH / 2f, r = (float) Math.hypot(cx, cy);
+        vignetteNormal = new RadialGradient(cx, cy, r, new int[]{0x00000000, 0x00000000, 0x40000000}, new float[]{0f, 0.6f, 1f}, Shader.TileMode.CLAMP);
+        vignetteDanger = new RadialGradient(cx, cy, r, new int[]{0x00000000, 0x00000000, 0x60FF0000}, new float[]{0f, 0.5f, 1f}, Shader.TileMode.CLAMP);
+    }
 
     private void startLoop(SurfaceHolder holder) {
         if (gameLoop == null || !gameLoop.isRunning()) { gameLoop = new GameLoop(holder, this); gameLoop.setRunning(true); gameLoop.start(); }
@@ -63,7 +76,6 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback {
     public boolean onTouchEvent(MotionEvent event) {
         float ex = event.getX(), ey = event.getY();
         
-        // 1. Shop overlay aktifse önce o eventleri yakalar
         if (uiOverlay != null && uiOverlay.isShopVisible()) {
             uiOverlay.handleShopTouch(event.getAction(), ex, ey, gameWorld.getShipRegistry(), gameWorld.getEconomy());
             return true;
@@ -73,13 +85,9 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback {
 
         switch (event.getAction()) {
             case MotionEvent.ACTION_DOWN:
-                if (state == Constants.STATE_PLAYING) {
-                    joystick.onTouchDown(ex, ey); 
-                } else if (state == Constants.STATE_PAUSED) {
-                    // handlePauseTap(ex, ey); 
-                } else {
-                    handleTap(ex, ey);
-                }
+                if (state == Constants.STATE_PLAYING) { joystick.onTouchDown(ex, ey); }
+                else if (state == Constants.STATE_SETTINGS) { uiOverlay.handleSettingsTouch(ex, ey, gameWorld); }
+                else { handleTap(ex, ey); }
                 break;
             case MotionEvent.ACTION_MOVE:
                 if (state == Constants.STATE_PLAYING) joystick.onTouchMove(ex, ey);
@@ -99,12 +107,6 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback {
             if (uiOverlay.isPlayHit(x, y)) { uiOverlay.resetGameOver(); gameWorld.startGame(); }
             else if (uiOverlay.isShopHit(x, y)) { uiOverlay.openShop(); }
             else if (uiOverlay.isSettingsHit(x, y)) gameWorld.openSettings();
-        } else if (state == Constants.STATE_SETTINGS) {
-            if (uiOverlay.isDiffHit(x, y)) gameWorld.cycleDifficulty();
-            else if (uiOverlay.isSpeedHit(x, y)) gameWorld.cycleGameSpeed();
-            else if (uiOverlay.isSoundHit(x, y)) gameWorld.toggleSound();
-            else if (uiOverlay.isVibHit(x, y)) gameWorld.toggleVibration();
-            else if (uiOverlay.isBackHit(x, y)) gameWorld.closeSettings();
         } else if (state == Constants.STATE_GAME_OVER) {
             if (uiOverlay.isRestartHit(x, y)) { uiOverlay.resetGameOver(); gameWorld.startGame(); }
             else { gameWorld.handleTap(); uiOverlay.resetGameOver(); }
@@ -113,12 +115,8 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback {
 
     public void updateGame() {
         if (uiOverlay != null) uiOverlay.update(0.016f);
-        if (background != null && gameWorld != null) {
-            background.update(gameWorld.getDifficulty(), gameWorld.getTempoPhase(), 0.016f);
-        }
-        if (gameWorld != null) {
-            gameWorld.update(joystick.getDirX(), joystick.getDirY(), joystick.getMagnitude());
-        }
+        if (background != null && gameWorld != null) background.update(gameWorld.getDifficulty(), gameWorld.getTempoPhase(), 0.016f);
+        if (gameWorld != null) gameWorld.update(joystick.getDirX(), joystick.getDirY(), joystick.getMagnitude());
     }
 
     public void drawGame(Canvas canvas) {
@@ -130,22 +128,40 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback {
         if (sx != 0 || sy != 0) canvas.translate(sx, sy);
         
         if (background != null) background.render(canvas);
-        
-        if (renderer != null && gameWorld != null && shipRenderer != null) {
-            // Renderer'ın içine gemi çizicisini de pass etmek iyi olabilir ama basit tutalım:
-            renderer.render(canvas, gameWorld); // background effects, enemies
-        }
+        if (renderer != null && gameWorld != null && shipRenderer != null) renderer.render(canvas, gameWorld);
         
         if (sx != 0 || sy != 0) canvas.translate(-sx, -sy);
 
-        int state = gameWorld != null ? gameWorld.getState() : Constants.STATE_MENU;
+        drawVignette(canvas);
+        drawRiskBorder(canvas);
 
-        if (state == Constants.STATE_PLAYING) {
-            if (joystick != null) joystick.render(canvas);
+        if (gameWorld != null && gameWorld.getState() == Constants.STATE_PLAYING && joystick != null) {
+            joystick.render(canvas);
         }
 
-        if (uiOverlay != null && gameWorld != null) {
-            uiOverlay.renderFull(canvas, gameWorld, shipRenderer);
+        if (uiOverlay != null && gameWorld != null) uiOverlay.renderFull(canvas, gameWorld, shipRenderer);
+    }
+
+    private void drawVignette(Canvas canvas) {
+        if (gameWorld == null || gameWorld.getState() != Constants.STATE_PLAYING) {
+            vignettePaint.setShader(vignetteNormal); vignettePaint.setAlpha(255);
+            canvas.drawRect(0, 0, screenW, screenH, vignettePaint); return;
         }
+        float danger = gameWorld.getDangerLevel();
+        currentDanger += (danger - currentDanger) * 0.1f;
+        if (currentDanger > 0.3f) { vignettePaint.setShader(vignetteDanger); vignettePaint.setAlpha((int)(currentDanger * 255)); }
+        else { vignettePaint.setShader(vignetteNormal); vignettePaint.setAlpha(255); }
+        canvas.drawRect(0, 0, screenW, screenH, vignettePaint);
+    }
+
+    private void drawRiskBorder(Canvas canvas) {
+        if (gameWorld == null || !gameWorld.isRiskWindowActive()) return;
+        float timer = gameWorld.getRiskWindowTimer();
+        float progress = timer / (float) Constants.RISK_WINDOW_DURATION;
+        float blink = progress < 0.25f ? (float)(Math.sin(timer * 0.5) * 0.4 + 0.6) : 1f;
+        int alpha = (int)(120 * progress * blink);
+        riskBorderPaint.setAlpha(alpha); riskBorderPaint.setStrokeWidth(3f);
+        canvas.drawLine(0, 0, screenW, 0, riskBorderPaint); canvas.drawLine(0, screenH, screenW, screenH, riskBorderPaint);
+        canvas.drawLine(0, 0, 0, screenH, riskBorderPaint); canvas.drawLine(screenW, 0, screenW, screenH, riskBorderPaint);
     }
 }

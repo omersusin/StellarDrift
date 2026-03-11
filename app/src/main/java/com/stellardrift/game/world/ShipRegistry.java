@@ -27,7 +27,7 @@ public class ShipRegistry {
         return new ShipData(
             STRIKER, "THE STRIKER", "Fast and deadly interceptor",
             1.3f, 4.0f, 1, 1.4f, 2, 0,
-            new float[]{-10f, 10f}, new float[]{-8f, -8f},
+            new float[]{-22f, 22f}, new float[]{-5f, -5f}, // DÜZELTİLDİ: Mesafeler açıldı (-10/10'dan -22/22'ye)
             new float[]{-4f, 4f}, new float[]{26f, 26f}, new float[]{3.5f, 3.5f},
             Color.rgb(60, 85, 110), Color.rgb(35, 55, 80), Color.rgb(45, 70, 100),
             Color.rgb(80, 210, 255), Color.rgb(120, 230, 255), Color.rgb(140, 200, 255),
@@ -40,7 +40,7 @@ public class ShipRegistry {
         return new ShipData(
             JUGGERNAUT, "THE JUGGERNAUT", "Heavy armored bomber",
             0.75f, 1.8f, 3, 0.8f, 2, 2500,
-            new float[]{-16f, 16f}, new float[]{-12f, -12f},
+            new float[]{-28f, 28f}, new float[]{-6f, -6f}, // DÜZELTİLDİ: Mesafeler açıldı (-16/16'dan -28/28'e)
             new float[]{-8f, -3f, 3f, 8f}, new float[]{24f, 24f, 24f, 24f}, new float[]{2.5f, 2f, 2f, 2.5f},
             Color.rgb(75, 65, 70), Color.rgb(50, 42, 48), Color.rgb(85, 70, 60),
             Color.rgb(255, 185, 50), Color.rgb(255, 210, 80), Color.rgb(255, 130, 40),
@@ -53,7 +53,7 @@ public class ShipRegistry {
         return new ShipData(
             PHANTOM, "THE PHANTOM", "Alien tech — Triple burst",
             1.0f, 2.8f, 2, 1.15f, 3, 5000,
-            new float[]{0f, -18f, 18f}, new float[]{-26f, -4f, -4f},
+            new float[]{0f, -24f, 24f}, new float[]{-26f, -2f, -2f}, // DÜZELTİLDİ: 3 mermi (0, -24, 24)
             new float[]{0f}, new float[]{20f}, new float[]{6f},
             Color.rgb(55, 35, 75), Color.rgb(35, 20, 55), Color.rgb(65, 40, 95),
             Color.rgb(100, 255, 160), Color.rgb(130, 255, 180), Color.rgb(60, 255, 120),
@@ -63,8 +63,7 @@ public class ShipRegistry {
     }
 
     private void buildStrikerPaths(ShipData ship) {
-        ship.hullPath = new Path();
-        Path h = ship.hullPath;
+        ship.hullPath = new Path(); Path h = ship.hullPath;
         h.moveTo(0, -28); h.lineTo(3, -24); h.lineTo(5, -20); h.lineTo(6.5f, -14);
         h.lineTo(7.5f, -8); h.lineTo(8, -3); h.lineTo(8.5f, 2); h.lineTo(8, 8);
         h.lineTo(7, 14); h.lineTo(6.5f, 18); h.lineTo(6, 22); h.lineTo(6.5f, 25);

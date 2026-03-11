@@ -29,7 +29,7 @@ public class Asteroid {
     int vertexCount;
 
     int baseColor;
-    int creditValue; // EKSIK METODUN CEVABI BURADA
+    int creditValue; // Dinamik Kredi
 
     private int age;
     private float masterAlpha;
@@ -39,16 +39,6 @@ public class Asteroid {
 
     private RectF boundsRect;
     private Paint bodyPaint, edgePaint, craterPaint, glowPaint, highlightPaint, flashOverlayPaint;
-
-    private static final int[][] COLORS = {
-        {0xFF546E7A, 0xFF37474F, 0xFF263238},
-        {0xFF5D4037, 0xFF3E2723, 0xFF212121},
-        {0xFF455A64, 0xFF1B5E20, 0xFF1A237E},
-        {0xFF616161, 0xFF424242, 0xFF212121},
-    };
-
-    private int colorIdx;
-    private float[][] craters;
 
     public Asteroid(int sw, int sh, float playerX) {
         float range = Constants.ASTEROID_MAX_SIZE - Constants.ASTEROID_MIN_SIZE;
@@ -68,12 +58,10 @@ public class Asteroid {
         float sRange = Constants.ASTEROID_MAX_SPEED - Constants.ASTEROID_MIN_SPEED;
         float speed = (Constants.ASTEROID_MIN_SPEED + (float)(Math.random() * sRange)) * (sw / 1080f);
         
-        // Mermiler dümdüz yukarı gider, o yüzden asteroidlerin dikey hızını kullanacağız (düz mantık)
         velX = 0;
         velY = speed;
 
         rotation = 0; rotSpeed = (float)(Math.random() * 2.5 - 1.25);
-        colorIdx = (int)(Math.random() * COLORS.length);
 
         age = 0; masterAlpha = 0;
         hasSine = Math.random() < Constants.ASTEROID_SINE_CHANCE;
@@ -81,11 +69,17 @@ public class Asteroid {
         sineAmp = sw * Constants.ASTEROID_SINE_AMP * (0.5f + (float)(Math.random() * 0.5));
         sineFreq = Constants.ASTEROID_SINE_FREQ * (0.7f + (float)(Math.random() * 0.6));
 
-        // HP ve Kredi Atamaları
-        if (radius < sw * 0.05f) { maxHP = 1; creditValue = 5; } 
-        else if (radius < sw * 0.065f) { maxHP = 3; creditValue = 15; } 
-        else { maxHP = 6; creditValue = 35; }
-        currentHP = maxHP;
+        // YENİ: DİNAMİK HP VE KREDİ HESAPLAMA
+        this.maxHP = Math.max(1, (int)(radius * 0.05f)); // Boyuta orantılı HP
+        this.currentHP = maxHP;
+
+        // Küçük taş (az kredi), Büyük taş (çok kredi)
+        this.creditValue = Math.max(3, (int)(radius * 0.15f)); 
+
+        // Renk de boyuta göre grinin tonları
+        float sizeRatio = Math.min(radius / (sw * 0.08f), 1f); 
+        int gray = (int)(145 - sizeRatio * 50);
+        baseColor = Color.rgb(gray + 10, gray, gray - 5);
 
         buildPolygon();
 
@@ -162,19 +156,19 @@ public class Asteroid {
 
         for (int i = 3; i >= 0; i--) { int a = Math.min(255, (4 + i) * ma / 255); glowPaint.setAlpha(a); c.drawCircle(0, 0, radius * (1.1f + i * 0.2f), glowPaint); }
 
-        int[] col = COLORS[colorIdx];
         float hpRatio = (float) currentHP / maxHP;
-        int rTop = Color.red(col[0]), gTop = (int)(Color.green(col[0]) * hpRatio), bTop = (int)(Color.blue(col[0]) * hpRatio);
-        int rBot = Color.red(col[1]), gBot = (int)(Color.green(col[1]) * hpRatio), bBot = (int)(Color.blue(col[1]) * hpRatio);
-        int dynamicCol0 = Color.rgb(Math.min(255, rTop + (int)((1f-hpRatio)*80)), gTop, bTop);
-        int dynamicCol1 = Color.rgb(Math.min(255, rBot + (int)((1f-hpRatio)*80)), gBot, bBot);
+        
+        int rTop = Color.red(baseColor), gTop = (int)(Color.green(baseColor) * hpRatio), bTop = (int)(Color.blue(baseColor) * hpRatio);
+        int rBot = Color.red(baseColor)-20, gBot = (int)((Color.green(baseColor)-20) * hpRatio), bBot = (int)((Color.blue(baseColor)-20) * hpRatio);
+        int dynamicCol0 = Color.rgb(Math.min(255, rTop + (int)((1f-hpRatio)*80)), Math.max(0, gTop), Math.max(0, bTop));
+        int dynamicCol1 = Color.rgb(Math.min(255, rBot + (int)((1f-hpRatio)*80)), Math.max(0, gBot), Math.max(0, bBot));
 
         bodyPaint.setShader(new LinearGradient(-radius, -radius, radius, radius, dynamicCol0, dynamicCol1, Shader.TileMode.CLAMP));
         bodyPaint.setAlpha(ma); c.drawPath(cachedPath, bodyPaint); bodyPaint.setShader(null);
         edgePaint.setAlpha(Math.min(120, 120 * ma / 255)); c.drawPath(cachedPath, edgePaint);
         highlightPaint.setAlpha(Math.min(40, 40 * ma / 255)); c.drawCircle(-radius * 0.2f, -radius * 0.25f, radius * 0.35f, highlightPaint);
 
-        craterPaint.setColor(col[2]);
+        craterPaint.setColor(Color.argb(140, 30, 30, 30));
         for (float[] cr : craters) {
             craterPaint.setAlpha(Math.min(140, 140 * ma / 255)); c.drawCircle(cr[0], cr[1], cr[2], craterPaint);
             craterPaint.setAlpha(Math.min(60, 60 * ma / 255)); c.drawCircle(cr[0] + cr[2] * 0.15f, cr[1] + cr[2] * 0.15f, cr[2] * 0.65f, craterPaint);
@@ -202,8 +196,6 @@ public class Asteroid {
     public float getY() { return y; }
     public float getSize() { return radius; }
     public boolean isDead() { return currentHP <= 0; }
-    
-    // EKSIK OLAN GETTER BURADA:
     public int getCreditValue() { return creditValue; }
     
     public RectF getBounds() { float s = radius * 0.65f; boundsRect.set(x - s, y - s, x + s, y + s); return boundsRect; }

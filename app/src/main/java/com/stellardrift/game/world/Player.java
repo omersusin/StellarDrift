@@ -41,17 +41,20 @@ public class Player {
 
     private ShipData currentShip;
     private ShipRenderer renderer;
-    private float scaleMultiplier; // Yeni Devasa Ölçek
+    private float scaleMultiplier; 
+    
+    // YENİ: YAKIT SİSTEMİ REFERANSI
+    private FuelSystem fuelSystem;
 
-    public Player(int sw, int sh, ShipRegistry registry) {
+    public Player(int sw, int sh, ShipRegistry registry, FuelSystem fuel) {
         screenW = sw; screenH = sh;
         x = sw / 2f; y = sh * Constants.PLAYER_START_Y_RATIO;
         prevX = x; bankAngle = 0; targetBank = 0; comboTier = 0;
         
         currentShip = registry.getSelectedShip();
         renderer = new ShipRenderer();
+        fuelSystem = fuel;
         
-        // EFSANEVİ BOYUT! (1.3f idi, 2.5f yaptık)
         scaleMultiplier = (sw / 1080f) * 2.5f;
 
         trailX = new float[TRAIL_LEN]; trailY = new float[TRAIL_LEN];
@@ -85,14 +88,18 @@ public class Player {
 
     public void update(float dirX, float dirY, float magnitude, float dt) {
         prevX = x;
+        
+        // YAKIT CARPANI ILE HIZ HESABI (YAKIT BITINCE YAVASLAR)
+        float fuelSpeedMult = (fuelSystem != null) ? fuelSystem.getSpeedMultiplier() : 1.0f;
+        
         if (magnitude > Constants.JOY_DEAD_ZONE) {
             float adjMag = (magnitude - Constants.JOY_DEAD_ZONE) / (1f - Constants.JOY_DEAD_ZONE);
-            float speed = screenW * Constants.PLAYER_MOVE_SPEED * adjMag * (dt * 60f) * currentShip.speedMultiplier;
+            float speed = screenW * Constants.PLAYER_MOVE_SPEED * adjMag * (dt * 60f) * currentShip.speedMultiplier * fuelSpeedMult;
             x += dirX * speed; y += dirY * speed;
         } else {
             idleHoverTimer += dt;
-            x += (float) Math.sin(idleHoverTimer * 1.1f) * 1.5f * dt * 60f;
-            y += (float) Math.sin(idleHoverTimer * 0.8f + 0.7f) * 2.0f * dt * 60f;
+            x += (float) Math.sin(idleHoverTimer * 1.1f) * 1.5f * dt * 60f * fuelSpeedMult;
+            y += (float) Math.sin(idleHoverTimer * 0.8f + 0.7f) * 2.0f * dt * 60f * fuelSpeedMult;
         }
 
         float margin = getSize();
