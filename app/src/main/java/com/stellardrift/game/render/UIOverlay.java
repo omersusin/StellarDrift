@@ -95,7 +95,7 @@ public class UIOverlay {
         dimPaint = new Paint(); dimPaint.setColor(DIM); dimPaint.setStyle(Paint.Style.FILL);
         labelPaint = makePaint(0xFFB0BEC5, sw * 0.04f, Paint.Align.LEFT, false);
         valuePaint = makePaint(WHITE, sw * 0.04f, Paint.Align.RIGHT, true);
-        accentPaint = makePaint(CYAN, sw * 0.06f, Paint.Align.CENTER, true); // Eksik buydu
+        accentPaint = makePaint(CYAN, sw * 0.06f, Paint.Align.CENTER, true);
         hudScorePaint = makePaint(WHITE, sw * 0.06f, Paint.Align.LEFT, true);
         hudLabelPaint = makePaint(0x99FFFFFF, sw * 0.025f, Paint.Align.LEFT, false);
         comboPaint = makePaint(GOLD, sw * 0.06f, Paint.Align.CENTER, true);
@@ -168,7 +168,7 @@ public class UIOverlay {
         } else if (world.getState() == Constants.STATE_GAME_OVER) {
             drawGameOver(c, world);
         } else if (world.getState() == Constants.STATE_SETTINGS) {
-            drawSettingsScreen(c, godModeActive);
+            drawSettingsScreen(c, world.isGodModeActive());
         }
 
         if (shopOpenAnim > 0.01f) drawShop(c, world.getShipRegistry(), world.getEconomy(), shipRenderer);
@@ -198,8 +198,6 @@ public class UIOverlay {
         }
     }
 
-    public void resetGameOver() { gameOverTime = 0; recordBroken = false; recordBreakParticleTimer = 0; }
-
     private void drawMenu(Canvas c, int highScore) {
         float p = (float)(Math.sin(pulse) * 0.08 + 0.92); float cx = sw / 2f;
         titlePaint.setTextSize(sw * 0.12f * p); titlePaint.setShader(new LinearGradient(cx - sw*0.3f, sh*0.22f, cx + sw*0.3f, sh*0.22f, CYAN, PURPLE, Shader.TileMode.CLAMP));
@@ -213,17 +211,26 @@ public class UIOverlay {
         
         subtitlePaint.setTextSize(sw * 0.035f); subtitlePaint.setAlpha((int)(150 * (Math.sin(pulse * 1.5) * 0.3 + 0.7))); 
         c.drawText("Destroy asteroids & upgrade ship!", cx, sh * 0.88f, subtitlePaint);
-        smallPaint.setTextSize(sw * 0.025f); smallPaint.setAlpha(80); c.drawText("v4.5 Fleet Commander", cx, sh * 0.95f, smallPaint);
+        smallPaint.setTextSize(sw * 0.025f); smallPaint.setAlpha(80); c.drawText("v4.5 Mega Fleet", cx, sh * 0.95f, smallPaint);
     }
 
     private void drawMenuButton(Canvas c, RectF rect, String text, int bgColor, int outlineColor) {
-        cardPaint.setColor(bgColor); cardPaint.setStyle(Paint.Style.FILL); c.drawRoundRect(rect, 25, 25, cardPaint);
-        cardBorderPaint.setColor(outlineColor); cardBorderPaint.setStyle(Paint.Style.STROKE); cardBorderPaint.setStrokeWidth(3f); c.drawRoundRect(rect, 25, 25, cardBorderPaint);
-        btnTextPaint.setColor(WHITE); c.drawText(text, rect.centerX(), rect.centerY() + sw * 0.015f, btnTextPaint);
+        cardPaint.setColor(bgColor);
+        cardPaint.setStyle(Paint.Style.FILL);
+        c.drawRoundRect(rect, 25, 25, cardPaint);
+
+        cardBorderPaint.setColor(outlineColor);
+        cardBorderPaint.setStyle(Paint.Style.STROKE);
+        cardBorderPaint.setStrokeWidth(3f);
+        c.drawRoundRect(rect, 25, 25, cardBorderPaint);
+
+        btnTextPaint.setColor(WHITE);
+        c.drawText(text, rect.centerX(), rect.centerY() + sw * 0.015f, btnTextPaint);
     }
 
     private void drawSettingsScreen(Canvas c, boolean godMode) {
         c.drawRect(0, 0, sw, sh, dimPaint);
+
         float cw = sw * 0.9f; float ch = sh * 0.6f;
         float cx = sw * 0.05f; float cy = sh * 0.2f;
 
@@ -254,12 +261,6 @@ public class UIOverlay {
         rowY += rowGap;
         drawSettingsLabel(c, "VIBRATION", cx + 40, rowY);
         drawOnOffToggle(c, cx + cw - sw*0.25f, rowY - sh*0.03f, sw*0.2f, sh*0.045f, vibrationEnabled, vibToggleRect);
-        c.drawLine(cx + 40, rowY + sh*0.04f, cx + cw - 40, rowY + sh*0.04f, dividerPaint);
-
-        rowY += rowGap;
-        drawSettingsLabel(c, "FUEL DRAIN", cx + 40, rowY);
-        smallPaint.setColor(Color.rgb(200, 180, 60)); smallPaint.setTextAlign(Paint.Align.RIGHT);
-        c.drawText("3.5/sec", cx + cw - 40, rowY, smallPaint); smallPaint.setTextAlign(Paint.Align.CENTER);
 
         if (godMode) {
             smallPaint.setColor(GOLD); smallPaint.setTextSize(sw * 0.035f);
@@ -490,7 +491,7 @@ public class UIOverlay {
         }
     }
 
-    // Touch Yönlendirmeleri (GameView çağırması için)
+    // Touch Yönlendirmeleri
     public boolean isPlayHit(float x, float y) { return playBtn.contains(x, y); }
     public boolean isShopHit(float x, float y) { return shopBtn.contains(x, y); }
     public boolean isSettingsHit(float x, float y) { return settingsBtn.contains(x, y); }
@@ -516,7 +517,7 @@ public class UIOverlay {
             case MotionEvent.ACTION_MOVE: int dy = lastTouchY - (int) ty; if (Math.abs((int) ty - touchDownY) > 15) isDraggingShop = true; if (isDraggingShop) scrollY = Math.max(0, Math.min(totalContentHeight - sh, scrollY + dy)); lastTouchY = (int) ty; return true;
             case MotionEvent.ACTION_UP:
                 if (!isDraggingShop) {
-                    if (Math.hypot(tx - (sw - sw * 0.1f), ty - (sh * 0.08f)) < CLOSE_BTN_HITBOX) { closeShop(); return true; }
+                    if (Math.hypot(tx - (sw - sw * 0.1f), ty - (sh * 0.08f)) < CLOSE_BTN_HITBOX) { closeShop(); currentState = STATE_MAIN_MENU; return true; }
                     float adjY = ty + scrollY;
                     for (int i = 0; i < registry.getShipCount(); i++) {
                         ShipData ship = registry.getShip(i); float cardY = cardStartY + i * (cardHeight + cardSpacing); float cx = (sw - cardWidth) / 2;
@@ -531,4 +532,11 @@ public class UIOverlay {
                 isDraggingShop = false; return true;
         } return true;
     }
+
+    public void resetGameOver() { gameOverTime = 0; recordBroken = false; recordBreakParticleTimer = 0; }
+    public void openShop() { isShopOpen = true; scrollY = 0; }
+    public void closeShop() { isShopOpen = false; }
+    public boolean isShopVisible() { return isShopOpen || shopOpenAnim > 0.01f; }
+    public int getCurrentState() { return currentState; }
+    public void setState(int state) { currentState = state; }
 }
