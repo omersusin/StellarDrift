@@ -72,35 +72,29 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
-          name: "Stellar Drift ${{ github.ref_name }} — The Masterpiece Update"
+          name: "Stellar Drift ${{ github.ref_name }} — The Shooter Update"
           body: |
             ## 🚀 Stellar Drift ${{ github.ref_name }}
 
             **An endless space survival game — made entirely by AI.**
             
-            This is the ultimate **"Masterpiece Update"**, bringing massive "Game-Feel" (Juice) improvements, micro-animations, and visual overhauls entirely via the Canvas API.
+            This is the massive **"Shooter Update"**, transforming the game from a simple dodger into a fully-fledged Space Shooter with a functioning economy and unlockable ships!
 
-            ### ✨ What's New
-            - 🎯 **Natural Snap Collection:** Stardust is now magnetically pulled to your ship when very close, creating a satisfying "snap" feeling.
-            - 📈 **High Score Proximity Line:** As you approach your best score, a golden line descends from the top of the screen to build tension.
-            - ⏱️ **Combo Decay Arc:** A visual ring around your ship shows exactly how much time is left to chain your combo.
-            - 💥 **Ring Bursts:** Collecting items now triggers a satisfying outward particle ring expansion.
-            - ⚡ **Graze Chain:** String together multiple near-misses for exponentially multiplying points and "DAREDEVIL" / "INSANE" popups.
-            - 🌌 **Cosmic Breathing:** The stars and nebulas now pulse subtly on a 4-second sinusoidal rhythm to make the universe feel alive.
-            - 🛸 **Idle Hover:** The ship now bobs in a gentle Lissajous pattern when you aren't moving the joystick.
-            - ⏳ **Hit Stall (Time Dilation):** The game world slows down for exactly 2 frames when collecting stardust, giving physical weight to the action.
-            - ⚠️ **Directional Danger Indicators:** The edges of the screen glow red based on where asteroids are approaching from.
-            - 👻 **Ship Afterimages:** Moving the ship fast now leaves a trailing motion-blur effect.
-            - 📺 **Chromatic Aberration:** Dying now triggers an optimized RGB color-split glitch effect.
-            - 📊 **Elastic UI Animations:** Score popups now spring to life using mathematical Elastic Out easing functions.
-            - 🛑 **Pause Menu:** Added the ability to pause the game safely.
-            - 🇬🇧 **Full English Translation:** All UI texts and popups are now correctly displayed in English.
+            ### 💥 What's New
+            - 🔫 **Auto-Fire Mechanics:** Your ship now automatically fires dual/triple projectiles based on your ship type.
+            - 🛸 **New Unlockable Ships:**
+              - **The Striker** (Default) - Fast & agile interceptor.
+              - **The Juggernaut** - Heavy, armored bomber with slow but devastating dual cannons.
+              - **The Phantom** - Alien technology featuring a triple-burst energy bolt.
+            - 🛒 **In-Game Shop:** Collect Cosmic Credits by destroying asteroids and use them in the beautifully drawn Canvas-UI Shop to unlock new ships!
+            - 🪨 **Destructible Asteroids:** Asteroids now have HP bars! Shoot them down for credits and explosive particle effects.
+            - ⚡ **Muzzle Flashes & Projectile Trails:** High-quality visual feedback added to every shot fired.
 
             ### 📱 Requirements
             - Android 5.0+ (API 21)
 
             ### 📦 Install
-            Download **StellarDrift-release.apk** and install.
+            Download **StellarDrift-release.apk** and start blasting asteroids!
           files: |
             app/build/outputs/apk/release/StellarDrift-release.apk
             app/build/outputs/apk/debug/StellarDrift-debug.apk
