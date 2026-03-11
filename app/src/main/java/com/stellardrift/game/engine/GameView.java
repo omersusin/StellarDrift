@@ -30,7 +30,6 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback {
     private UIOverlay uiOverlay;
     private Joystick joystick;
     
-    // Ses ve Titreşim Motorları
     private SoundManager soundManager;
     private VibrationManager vibrationManager;
 
@@ -77,7 +76,9 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback {
         if (shipRenderer == null) shipRenderer = new ShipRenderer();
         if (uiOverlay == null) {
             uiOverlay = new UIOverlay(screenW, screenH);
-            uiOverlay.initPrefs(gameWorld.getSettings());
+            
+            // HATA ÇÖZÜMÜ: initPrefs artık ShipRegistry de alıyor
+            uiOverlay.initPrefs(gameWorld.getSettings(), gameWorld.getShipRegistry());
             uiOverlay.setFuelSystem(gameWorld.getFuelSystem());
         }
         
