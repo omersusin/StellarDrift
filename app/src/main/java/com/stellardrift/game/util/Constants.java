@@ -90,6 +90,12 @@ public final class Constants {
     public static final int NEAR_MISS_COOLDOWN = 90;
     public static final int NEAR_MISS_FLASH_LIFE = 10;
 
+    // Masterpiece Yeni Sabitleri
+    public static final int GRAZE_CHAIN_WINDOW = 180; // 3 Saniye
+    public static final float NATURAL_MAGNET_RADIUS_RATIO = 0.1f;
+    public static final float NATURAL_MAGNET_STRENGTH = 0.15f;
+    public static final float POWERUP_MAGNET_STRENGTH = 0.40f;
+
     public static final int RISK_WINDOW_DURATION = 120;
     public static final float RISK_WINDOW_MULT = 1.5f;
 
@@ -115,19 +121,16 @@ public final class Constants {
     public static final int POWERUP_SHIELD = 3;
     public static final int POWERUP_DURATION = 300;
     public static final int POWERUP_SPAWN_INTERVAL = 600;
-    public static final float MAGNET_RANGE = 0.3f;
+    public static final float MAGNET_RANGE = 0.35f;
     public static final float SLOWMO_FACTOR = 0.5f;
 
     public static final int POPUP_LIFETIME = 30;
 
-    // Transition
     public static final float TRANSITION_SPEED_IN = 0.04f;
     public static final float TRANSITION_SPEED_OUT = 0.05f;
 
-    // Tutorial
     public static final int TUTORIAL_MAX_GAMES = 3;
 
-    // Combo trail colors
     public static final int[] COMBO_TRAIL_COLORS = {
         0xFF64B5F6, // 0 — blue
         0xFF66BB6A, // 1-2 — green

@@ -21,6 +21,7 @@ public class UIOverlay {
     private Paint hudScorePaint, hudLabelPaint, diffBarBg, diffBarFill;
     private Paint comboPaint, powerBarBg, powerBarFill, statPaint;
     private Paint milestonePaint, tempoPaint, riskPaint;
+    private Paint highScoreLinePaint, highScoreTextPaint;
 
     private RectF playBtn, settingsBtn, backBtn;
     private RectF diffBtn, speedBtn, soundBtn, vibBtn;
@@ -29,6 +30,9 @@ public class UIOverlay {
     private float pulse;
     private long gameOverTime;
     private static final long BUTTON_DELAY = 1200;
+
+    private boolean recordBroken = false;
+    private float recordBreakParticleTimer = 0;
 
     private static final int CYAN = 0xFF00E5FF;
     private static final int PURPLE = 0xFF7C4DFF;
@@ -62,6 +66,9 @@ public class UIOverlay {
         tempoPaint = makePaint(WHITE, sw * 0.02f, Paint.Align.RIGHT, false);
         riskPaint = makePaint(GOLD, sw * 0.025f, Paint.Align.CENTER, true);
 
+        highScoreLinePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        highScoreTextPaint = makePaint(GOLD, sw * 0.025f, Paint.Align.RIGHT, true);
+
         float cx = sw / 2f, bw = sw * 0.55f, bh = sh * 0.065f;
         playBtn = new RectF(cx - bw/2, sh * 0.52f, cx + bw/2, sh * 0.52f + bh);
         settingsBtn = new RectF(cx - bw/2, sh * 0.61f, cx + bw/2, sh * 0.61f + bh);
@@ -86,10 +93,58 @@ public class UIOverlay {
         pulse += 0.04f;
         switch (world.getState()) {
             case Constants.STATE_MENU: drawMenu(c, world.getHighScore()); break;
-            case Constants.STATE_PLAYING: drawHUD(c, world); drawMilestone(c, world); break;
+            case Constants.STATE_PLAYING: 
+                drawHUD(c, world); 
+                drawMilestone(c, world); 
+                drawHighScoreProximity(c, world);
+                break;
             case Constants.STATE_GAME_OVER: drawGameOver(c, world); break;
             case Constants.STATE_SETTINGS: drawSettings(c, world.getSettings()); break;
         }
+    }
+
+    private void drawHighScoreProximity(Canvas c, GameWorld world) {
+        int hs = world.getHighScore();
+        if (hs <= 500) return;
+
+        int score = world.getScore();
+        float ratio = (float) score / hs;
+        
+        if (ratio >= 0.85f && ratio < 1.0f && !recordBroken) {
+            float progress = (ratio - 0.85f) / 0.15f;
+            float lineY = sh * 0.20f * (1f - progress) + sh * 0.10f;
+            int alpha = (int)(60 + 150 * progress);
+            
+            highScoreLinePaint.setColor(Color.argb(alpha, 255, 215, 0));
+            highScoreLinePaint.setStrokeWidth(3f);
+            
+            float dashOffset = (System.currentTimeMillis() % 1000) / 1000f * 30f;
+            for (float x = -dashOffset; x < sw; x += 40f) {
+                c.drawLine(x, lineY, x + 20f, lineY, highScoreLinePaint);
+            }
+            
+            highScoreTextPaint.setColor(Color.argb(alpha, 255, 215, 0));
+            c.drawText("● RECORD", sw - sw * 0.04f, lineY - 10, highScoreTextPaint);
+            
+        } else if (ratio >= 1.0f && !recordBroken) {
+            recordBroken = true;
+            recordBreakParticleTimer = 1.0f;
+        }
+
+        if (recordBroken && recordBreakParticleTimer > 0) {
+            recordBreakParticleTimer -= 0.016f;
+            if (recordBreakParticleTimer > 0) {
+                highScoreTextPaint.setColor(Color.argb((int)(255 * recordBreakParticleTimer), 255, 215, 0));
+                highScoreTextPaint.setTextSize(sw * 0.035f);
+                c.drawText("NEW RECORD!", sw / 2f, sh * 0.18f, highScoreTextPaint);
+                highScoreTextPaint.setTextSize(sw * 0.025f);
+            }
+        }
+    }
+
+    public void resetRecordBroken() {
+        recordBroken = false;
+        recordBreakParticleTimer = 0;
     }
 
     private void drawMenu(Canvas c, int highScore) {
@@ -106,7 +161,7 @@ public class UIOverlay {
         float pa = (float)(Math.sin(pulse * 1.5) * 0.3 + 0.7);
         subtitlePaint.setAlpha((int)(150 * pa));
         c.drawText("Use joystick to fly freely", cx, sh * 0.85f, subtitlePaint);
-        smallPaint.setAlpha(80); c.drawText("v2.0", cx, sh * 0.95f, smallPaint);
+        smallPaint.setAlpha(80); c.drawText("v3.0 Masterpiece", cx, sh * 0.95f, smallPaint);
     }
 
     private void drawHUD(Canvas c, GameWorld world) {
@@ -131,15 +186,6 @@ public class UIOverlay {
             int tc = tempo == Constants.TEMPO_PRESSURE ? 0xFFFF1744 : GOLD;
             tempoPaint.setColor(tc); tempoPaint.setAlpha(180); tempoPaint.setTextAlign(Paint.Align.RIGHT);
             c.drawText(tl, sw - pad, sh * 0.095f, tempoPaint);
-        }
-
-        int combo = world.getCombo();
-        if (combo > 1) {
-            float cp = (float)(Math.sin(pulse * 4) * 0.1 + 0.9);
-            comboPaint.setTextSize(sw * (0.04f + combo * 0.003f) * cp);
-            comboPaint.setColor(combo >= 10 ? 0xFFFF6D00 : combo >= 5 ? GOLD : WHITE);
-            comboPaint.setAlpha(220);
-            c.drawText("x" + combo + " COMBO", sw / 2f, sh * 0.13f, comboPaint);
         }
 
         if (world.isRiskWindowActive()) {

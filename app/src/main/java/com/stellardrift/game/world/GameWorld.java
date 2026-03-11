@@ -1,6 +1,7 @@
 package com.stellardrift.game.world;
 
 import android.content.Context;
+import android.graphics.Color;
 import android.graphics.RectF;
 import com.stellardrift.game.util.Constants;
 import com.stellardrift.game.util.SettingsManager;
@@ -48,19 +49,19 @@ public class GameWorld {
     private int milestoneTimer;
     private float dangerLevel;
     private List<float[]> spawnWarnings;
-
-    // Near-miss flash lines
     private List<float[]> nearMissFlashes;
 
-    // StarDust chain tracking
+    // Graze Chain
+    private int grazeChainCount;
+    private int grazeChainTimer;
+
+    // Ring Bursts
+    private List<float[]> ringBursts; // x, y, dirX, dirY, speed, life, color
+
     private int chainCounter;
     private int chainTarget;
     private boolean chainActive;
-
-    // Tutorial
     private boolean firstStarDustSeen, firstNearMiss;
-
-    // Transition
     private float transitionAlpha;
     private boolean transitioningIn;
 
@@ -82,6 +83,7 @@ public class GameWorld {
         popups = new ArrayList<>();
         spawnWarnings = new ArrayList<>();
         nearMissFlashes = new ArrayList<>();
+        ringBursts = new ArrayList<>();
 
         state = Constants.STATE_MENU;
         tempoPhase = Constants.TEMPO_CALM;
@@ -94,6 +96,7 @@ public class GameWorld {
         updateShake();
         updateShockwave();
         updateNearMissFlashes();
+        updateRingBursts();
         updateTransition();
 
         if (state == Constants.STATE_PAUSED) return;
@@ -106,7 +109,11 @@ public class GameWorld {
         difficulty = Math.min(Constants.MAX_DIFFICULTY, 1f + frameCount * Constants.DIFFICULTY_RATE);
 
         player.update(joyDirX, joyDirY, joyMag);
-        player.setComboTier(combo);
+        
+        // Combo bilgilerini yolla
+        float comboProg = comboTimer > 0 ? (float)comboTimer / Constants.COMBO_TIMEOUT : 0f;
+        player.setComboInfo(combo, comboProg);
+        
         updateTimers();
         updateTempo();
         updateDangerLevel();
@@ -115,7 +122,10 @@ public class GameWorld {
 
         float effDiff = getEffectiveDifficulty(speedMult, gameSpeedMult);
         moveEntities(effDiff);
-        if (magnetActive) applyMagnet();
+        
+        // StarDust Magnet (Hem Power-Up hem Doğal)
+        applyStarDustMagnet();
+        
         checkCollisions();
         cleanOffscreen();
         checkMilestone();
@@ -124,6 +134,7 @@ public class GameWorld {
 
     private void updateTimers() {
         if (nearMissCooldown > 0) nearMissCooldown--;
+        if (grazeChainTimer > 0) { grazeChainTimer--; if (grazeChainTimer <= 0) grazeChainCount = 0; }
         if (combo > 0) { comboTimer--; if (comboTimer <= 0) { combo = 0; overdriveTriggered = false; chainActive = false; } }
         if (magnetActive) { magnetTimer--; if (magnetTimer <= 0) magnetActive = false; }
         if (slowmoActive) { slowmoTimer--; if (slowmoTimer <= 0) slowmoActive = false; }
@@ -148,6 +159,18 @@ public class GameWorld {
     private void updateNearMissFlashes() {
         Iterator<float[]> it = nearMissFlashes.iterator();
         while (it.hasNext()) { float[] f = it.next(); f[4]--; if (f[4] <= 0) it.remove(); }
+    }
+    
+    private void updateRingBursts() {
+        Iterator<float[]> it = ringBursts.iterator();
+        while (it.hasNext()) { 
+            float[] b = it.next(); 
+            b[0] += b[2] * b[4] * 0.016f; // x += dirX * speed * dt
+            b[1] += b[3] * b[4] * 0.016f; // y += dirY * speed * dt
+            b[4] *= 0.92f; // Yavaşla
+            b[5] -= 0.016f * 5f; // Life azalır (~200ms)
+            if (b[5] <= 0) it.remove(); 
+        }
     }
 
     private void updateTransition() {
@@ -205,15 +228,10 @@ public class GameWorld {
     }
 
     private void spawnStarDustChain() {
-        int count = Constants.STARDUST_CHAIN_MIN +
-            (int)(Math.random() * (Constants.STARDUST_CHAIN_MAX - Constants.STARDUST_CHAIN_MIN + 1));
-        chainTarget = count;
-        chainCounter = 0;
-        chainActive = true;
-
+        int count = Constants.STARDUST_CHAIN_MIN + (int)(Math.random() * (Constants.STARDUST_CHAIN_MAX - Constants.STARDUST_CHAIN_MIN + 1));
+        chainTarget = count; chainCounter = 0; chainActive = true;
         float startX = screenW * 0.15f + (float)(Math.random() * screenW * 0.7f);
         float endX = screenW * 0.15f + (float)(Math.random() * screenW * 0.7f);
-
         for (int i = 0; i < count; i++) {
             float t = (float) i / (count - 1);
             float cx = startX + (endX - startX) * t;
@@ -244,13 +262,10 @@ public class GameWorld {
         while (pi.hasNext()) { Particle p = pi.next(); p.update(); if (!p.isAlive()) pi.remove(); }
     }
 
-    private void applyMagnet() {
-        float range = screenW * Constants.MAGNET_RANGE;
+    private void applyStarDustMagnet() {
         float px = player.getX(), py = player.getY();
         for (StarDust s : starDusts) {
-            float dx = px - s.getX(), dy = py - s.getY();
-            float dist = (float) Math.sqrt(dx * dx + dy * dy);
-            if (dist < range && dist > 1) s.pull(dx / dist * 6f, dy / dist * 6f);
+            s.applyMagnet(px, py, screenW, magnetActive);
         }
     }
 
@@ -285,6 +300,18 @@ public class GameWorld {
         }
     }
 
+    private void spawnRingBurst(float x, float y, int color) {
+        int count = 7;
+        float angleStep = (float)(2 * Math.PI / count);
+        for (int i = 0; i < count; i++) {
+            float angle = angleStep * i + (float)(Math.random() * 0.3);
+            float dirX = (float) Math.cos(angle);
+            float dirY = (float) Math.sin(angle);
+            float speed = 150 + (float)(Math.random() * 80);
+            ringBursts.add(new float[]{x, y, dirX, dirY, speed, 1f, color});
+        }
+    }
+
     private void collectStarDust(StarDust s) {
         combo++; comboTimer = Constants.COMBO_TIMEOUT;
         if (combo > maxCombo) maxCombo = combo;
@@ -307,14 +334,14 @@ public class GameWorld {
         }
 
         popups.add(ScorePopup.createCollect(s.getX(), s.getY(), fp, cm));
-        spawnParticles(s.getX(), s.getY(), Constants.COLLECT_PARTICLES, 0xFFFFD740);
+        spawnRingBurst(s.getX(), s.getY(), 0xFFFFD740); // Ring Burst eklendi
         sound.playCollect(); vibration.vibrateCollect();
     }
 
     private void collectPowerUp(PowerUp pu) {
         activatePowerUp(pu.getType());
         popups.add(ScorePopup.createPowerUp(pu.getX(), pu.getY(), pu.getType()));
-        spawnParticles(pu.getX(), pu.getY(), Constants.COLLECT_PARTICLES, PowerUp.getColor(pu.getType()));
+        spawnRingBurst(pu.getX(), pu.getY(), PowerUp.getColor(pu.getType())); // Ring Burst
         sound.playCollect(); vibration.vibrateCollect();
     }
 
@@ -330,12 +357,35 @@ public class GameWorld {
     private void onNearMiss(float px, float py, float ax, float ay) {
         nearMissCooldown = Constants.NEAR_MISS_COOLDOWN; nearMissCount++;
         if (!firstNearMiss) firstNearMiss = true;
-        int bonus = Constants.NEAR_MISS_BONUS;
-        if (riskWindowActive) bonus = (int)(bonus * Constants.RISK_WINDOW_MULT);
-        score += bonus;
-        popups.add(ScorePopup.createNearMiss(px, py));
+        
+        // Graze Chain Logic
+        grazeChainCount++;
+        grazeChainTimer = Constants.GRAZE_CHAIN_WINDOW;
+        
+        // Katlanarak artan puan
+        int grazePoints = Constants.NEAR_MISS_BONUS * (1 << (Math.min(grazeChainCount, 6) - 1));
+        if (riskWindowActive) grazePoints = (int)(grazePoints * Constants.RISK_WINDOW_MULT);
+        score += grazePoints;
+        
+        int textColor;
+        switch (grazeChainCount) {
+            case 1: textColor = Color.WHITE; break;
+            case 2: textColor = Color.CYAN; break;
+            case 3: textColor = Color.MAGENTA; break;
+            default: textColor = Color.rgb(255, 100, 0); break;
+        }
+        
+        if (grazeChainCount >= 3) {
+            popups.add(new ScorePopup(px, py - 70, grazeChainCount >= 5 ? "INSANE!" : "DAREDEVIL!", textColor));
+        }
+        
+        popups.add(new ScorePopup(px, py - 40, "+" + grazePoints, textColor));
+        
         riskWindowActive = true; riskWindowTimer = Constants.RISK_WINDOW_DURATION;
         nearMissFlashes.add(new float[]{px, py, ax, ay, Constants.NEAR_MISS_FLASH_LIFE});
+        
+        // Daha güçlü titreşim
+        if (grazeChainCount > 1) vibration.vibrateExplosion(); 
     }
 
     private void checkOverdrive() {
@@ -419,7 +469,6 @@ public class GameWorld {
         Iterator<PowerUp> pi = powerUps.iterator(); while (pi.hasNext()) if (pi.next().isOffScreen(screenH)) pi.remove();
     }
 
-    // State management
     public void handleTap() {
         if (state == Constants.STATE_GAME_OVER) { state = Constants.STATE_MENU; sound.playClick(); vibration.vibrateClick(); }
     }
@@ -439,9 +488,10 @@ public class GameWorld {
         chainActive = false; chainCounter = 0; chainTarget = 0;
         firstStarDustSeen = false; firstNearMiss = false;
         transitionAlpha = 1f; transitioningIn = true;
+        grazeChainCount = 0; grazeChainTimer = 0;
         startTime = System.currentTimeMillis();
         asteroids.clear(); starDusts.clear(); particles.clear();
-        powerUps.clear(); popups.clear(); spawnWarnings.clear(); nearMissFlashes.clear();
+        powerUps.clear(); popups.clear(); spawnWarnings.clear(); nearMissFlashes.clear(); ringBursts.clear();
         player.reset();
     }
 
@@ -455,7 +505,6 @@ public class GameWorld {
     public void toggleSound() { settings.toggleSound(); sound.setEnabled(settings.isSoundEnabled()); if (settings.isSoundEnabled()) sound.playClick(); }
     public void toggleVibration() { settings.toggleVibration(); vibration.setEnabled(settings.isVibrationEnabled()); vibration.vibrateClick(); }
 
-    // Getters
     public int getState() { return state; }
     public int getScore() { return score; }
     public int getHighScore() { return settings.getHighScore(); }
@@ -495,6 +544,7 @@ public class GameWorld {
     public int getMilestoneTimer() { return milestoneTimer; }
     public List<float[]> getSpawnWarnings() { return spawnWarnings; }
     public List<float[]> getNearMissFlashes() { return nearMissFlashes; }
+    public List<float[]> getRingBursts() { return ringBursts; }
     public float getTransitionAlpha() { return transitionAlpha; }
     public boolean isFirstStarDustSeen() { return firstStarDustSeen; }
     public boolean isFirstNearMiss() { return firstNearMiss; }
