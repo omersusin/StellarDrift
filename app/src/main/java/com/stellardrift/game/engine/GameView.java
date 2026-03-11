@@ -12,6 +12,8 @@ import android.view.MotionEvent;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
 import com.stellardrift.game.util.Constants;
+import com.stellardrift.game.util.SoundManager;
+import com.stellardrift.game.util.VibrationManager;
 import com.stellardrift.game.world.GameWorld;
 import com.stellardrift.game.render.SpaceBackground;
 import com.stellardrift.game.render.Renderer;
@@ -27,6 +29,10 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback {
     private ShipRenderer shipRenderer;
     private UIOverlay uiOverlay;
     private Joystick joystick;
+    
+    // Ses ve Titreşim Motorları
+    private SoundManager soundManager;
+    private VibrationManager vibrationManager;
 
     private int screenW, screenH;
 
@@ -61,6 +67,10 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback {
     @Override
     public void surfaceCreated(SurfaceHolder holder) {
         screenW = getWidth(); screenH = getHeight();
+        
+        soundManager = new SoundManager();
+        vibrationManager = new VibrationManager(getContext());
+        
         if (background == null) background = new SpaceBackground(screenW, screenH);
         if (gameWorld == null) gameWorld = new GameWorld(screenW, screenH, getContext());
         if (renderer == null) renderer = new Renderer();
@@ -70,6 +80,13 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback {
             uiOverlay.initPrefs(gameWorld.getSettings());
             uiOverlay.setFuelSystem(gameWorld.getFuelSystem());
         }
+        
+        soundManager.setEnabled(uiOverlay.isSoundEnabled());
+        vibrationManager.setEnabled(uiOverlay.isVibrationEnabled());
+        if (soundManager.isEnabled()) soundManager.startDrone();
+        
+        gameWorld.setAudioEngine(soundManager, vibrationManager);
+        
         if (joystick == null) joystick = new Joystick(screenW);
         initVignette();
         initPauseUI();
@@ -77,7 +94,13 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback {
     }
 
     @Override public void surfaceChanged(SurfaceHolder h, int f, int w, int h2) { screenW = w; screenH = h2; }
-    @Override public void surfaceDestroyed(SurfaceHolder holder) { stopLoop(); }
+    
+    @Override 
+    public void surfaceDestroyed(SurfaceHolder holder) { 
+        stopLoop(); 
+        if (soundManager != null) soundManager.release();
+        if (vibrationManager != null) vibrationManager.cancel();
+    }
 
     private void initVignette() {
         float cx = screenW / 2f, cy = screenH / 2f, r = (float) Math.hypot(cx, cy);
@@ -100,14 +123,15 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback {
     private void stopLoop() {
         if (gameLoop != null) { gameLoop.setRunning(false); boolean r = true; while (r) { try { gameLoop.join(1000); r = false; } catch (InterruptedException ignored) {} } gameLoop = null; }
     }
-    public void resume() {} public void pause() { stopLoop(); }
+    public void resume() { if (soundManager != null && soundManager.isEnabled()) soundManager.startDrone(); } 
+    public void pause() { stopLoop(); if (soundManager != null) soundManager.stopDrone(); }
 
     @Override
     public boolean onTouchEvent(MotionEvent event) {
         float ex = event.getX(), ey = event.getY();
         
         if (uiOverlay != null && uiOverlay.isShopVisible()) {
-            uiOverlay.handleShopTouch(event.getAction(), ex, ey, gameWorld.getShipRegistry(), gameWorld.getEconomy());
+            uiOverlay.handleShopTouch(event.getAction(), ex, ey, gameWorld.getShipRegistry(), gameWorld.getEconomy(), soundManager, vibrationManager);
             return true;
         }
 
@@ -116,12 +140,12 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback {
         switch (event.getAction()) {
             case MotionEvent.ACTION_DOWN:
                 if (state == Constants.STATE_PLAYING) {
-                    if (pauseBtn != null && pauseBtn.contains(ex, ey)) { gameWorld.pauseGame(); } 
+                    if (pauseBtn != null && pauseBtn.contains(ex, ey)) { gameWorld.pauseGame(); if(soundManager!=null) soundManager.playMenuClick(); } 
                     else { joystick.onTouchDown(ex, ey); }
                 } else if (state == Constants.STATE_PAUSED) {
                     handlePauseTap(ex, ey);
                 } else if (state == Constants.STATE_SETTINGS) { 
-                    uiOverlay.handleSettingsTouch(ex, ey, gameWorld); 
+                    uiOverlay.handleSettingsTouch(ex, ey, gameWorld, soundManager, vibrationManager); 
                 } else { 
                     handleTap(ex, ey); 
                 }
@@ -139,19 +163,19 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback {
 
     private void handlePauseTap(float x, float y) {
         if (gameWorld == null) return;
-        if (pauseResumeBtn != null && pauseResumeBtn.contains(x, y)) { gameWorld.resumeGame(); } 
-        else if (pauseQuitBtn != null && pauseQuitBtn.contains(x, y)) { gameWorld.quitToMenu(); }
+        if (pauseResumeBtn != null && pauseResumeBtn.contains(x, y)) { gameWorld.resumeGame(); if(soundManager!=null) soundManager.playMenuClick(); } 
+        else if (pauseQuitBtn != null && pauseQuitBtn.contains(x, y)) { gameWorld.quitToMenu(); if(soundManager!=null) soundManager.playMenuClick(); }
     }
 
     private void handleTap(float x, float y) {
         if (gameWorld == null || uiOverlay == null) return;
         int state = gameWorld.getState();
         if (state == Constants.STATE_MENU) {
-            if (uiOverlay.isPlayHit(x, y)) { uiOverlay.resetGameOver(); gameWorld.startGame(); }
-            else if (uiOverlay.isShopHit(x, y)) { uiOverlay.openShop(); }
-            else if (uiOverlay.isSettingsHit(x, y)) gameWorld.openSettings();
+            if (uiOverlay.isPlayHit(x, y)) { uiOverlay.resetGameOver(); gameWorld.startGame(); if(soundManager!=null) soundManager.playMenuClick(); }
+            else if (uiOverlay.isShopHit(x, y)) { uiOverlay.openShop(); if(soundManager!=null) soundManager.playMenuClick(); }
+            else if (uiOverlay.isSettingsHit(x, y)) { gameWorld.openSettings(); if(soundManager!=null) soundManager.playMenuClick(); }
         } else if (state == Constants.STATE_GAME_OVER) {
-            if (uiOverlay.isRestartHit(x, y)) { uiOverlay.resetGameOver(); gameWorld.startGame(); }
+            if (uiOverlay.isRestartHit(x, y)) { uiOverlay.resetGameOver(); gameWorld.startGame(); if(soundManager!=null) soundManager.playMenuClick(); }
             else { gameWorld.handleTap(); uiOverlay.resetGameOver(); }
         }
     }

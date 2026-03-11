@@ -12,6 +12,8 @@ import android.view.MotionEvent;
 import com.stellardrift.game.util.Constants;
 import com.stellardrift.game.util.EconomyManager;
 import com.stellardrift.game.util.SettingsManager;
+import com.stellardrift.game.util.SoundManager;
+import com.stellardrift.game.util.VibrationManager;
 import com.stellardrift.game.world.FuelSystem;
 import com.stellardrift.game.world.GameWorld;
 import com.stellardrift.game.world.PowerUp;
@@ -29,7 +31,11 @@ public class UIOverlay {
     private int currentState = STATE_MAIN_MENU;
     private int sw, sh;
 
-    // Menüye Özgü İzole Paint'ler
+    // ── OPAK ARKA PLAN BOYA KATMANLARI (Shop & Settings Bug Fix) ──
+    private final Paint bgBlackPaint = new Paint();
+    private final Paint bgOverlayPaint = new Paint();
+
+    // ── ANA MENÜYE ÖZEL İZOLE BOYA KATMANLARI (State Leak Fix) ──
     private final Paint menuTitlePaint1 = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint menuTitlePaint2 = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint menuSubPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -38,9 +44,9 @@ public class UIOverlay {
     private final Paint menuBtnTextPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint menuCreditPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
 
-    // Diğer UI Paint'leri
+    // Diğer Genel UI Paintleri
     private Paint titlePaint, subtitlePaint, scorePaint, smallPaint;
-    private Paint cardPaint, cardBorderPaint, btnTextPaint; 
+    private Paint cardPaint, cardBorderPaint, btnTextPaint;
     private Paint dimPaint, labelPaint, valuePaint, accentPaint;
     private Paint hudScorePaint, hudLabelPaint, diffBarBg, diffBarFill;
     private Paint comboPaint, powerBarBg, powerBarFill, statPaint;
@@ -48,8 +54,8 @@ public class UIOverlay {
     private Paint highScoreLinePaint, highScoreTextPaint;
     private Paint closeBtnCirclePaint, closeBtnXPaint;
     private Paint toggleBgPaint, toggleActivePaint, toggleTextPaint, dividerPaint;
-    private Paint shopBgPaint, statBarBgPaint, statBarPaint, statBarFill, upgradeBtnPaint;
-    private Paint selectedGlow; 
+    private Paint statBarBgPaint, statBarPaint, statBarFill, upgradeBtnPaint;
+    private Paint selectedGlow;
 
     // Menü ve Buton Alanları
     private RectF playBtn = new RectF();
@@ -66,7 +72,7 @@ public class UIOverlay {
     private float pulse;
     private long gameOverTime;
     private static final long BUTTON_DELAY = 1200;
-    private static final float CLOSE_BTN_HITBOX = 50f;
+    private static final float CLOSE_BTN_HITBOX = 60f; // Daha geniş hitbox
 
     private boolean recordBroken = false;
     private float recordBreakParticleTimer = 0;
@@ -99,6 +105,10 @@ public class UIOverlay {
     public UIOverlay(int sw, int sh) {
         this.sw = sw; this.sh = sh; pulse = 0; gameOverTime = 0;
 
+        // Opak Arka Plan Paint'leri
+        bgBlackPaint.setStyle(Paint.Style.FILL);
+        bgOverlayPaint.setStyle(Paint.Style.FILL);
+
         titlePaint = makePaint(CYAN, sw * 0.1f, Paint.Align.CENTER, true);
         subtitlePaint = makePaint(WHITE, sw * 0.04f, Paint.Align.CENTER, false); subtitlePaint.setAlpha(180);
         scorePaint = makePaint(WHITE, sw * 0.08f, Paint.Align.CENTER, true);
@@ -106,7 +116,7 @@ public class UIOverlay {
         
         cardPaint = new Paint(Paint.ANTI_ALIAS_FLAG); cardPaint.setStyle(Paint.Style.FILL);
         cardBorderPaint = new Paint(Paint.ANTI_ALIAS_FLAG); cardBorderPaint.setStyle(Paint.Style.STROKE);
-        btnTextPaint = makePaint(WHITE, sw * 0.045f, Paint.Align.CENTER, true); 
+        btnTextPaint = makePaint(WHITE, sw * 0.045f, Paint.Align.CENTER, true);
         
         dimPaint = new Paint(); dimPaint.setColor(DIM); dimPaint.setStyle(Paint.Style.FILL);
         labelPaint = makePaint(0xFFB0BEC5, sw * 0.04f, Paint.Align.LEFT, false);
@@ -133,10 +143,9 @@ public class UIOverlay {
         toggleTextPaint = makePaint(WHITE, sw * 0.03f, Paint.Align.CENTER, true);
         dividerPaint = new Paint(); dividerPaint.setColor(Color.argb(40, 150, 160, 180)); dividerPaint.setStrokeWidth(2f);
         
-        shopBgPaint = new Paint(); shopBgPaint.setColor(Color.argb(235, 8, 10, 18));
         statBarBgPaint = new Paint(); statBarBgPaint.setColor(Color.argb(80, 40, 45, 60));
         statBarPaint = new Paint(); statBarPaint.setStyle(Paint.Style.FILL);
-        statBarFill = new Paint(); statBarFill.setStyle(Paint.Style.FILL); 
+        statBarFill = new Paint(); statBarFill.setStyle(Paint.Style.FILL);
         upgradeBtnPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
         
         selectedGlow = new Paint(Paint.ANTI_ALIAS_FLAG); 
@@ -153,6 +162,7 @@ public class UIOverlay {
         playBtn = new RectF(cx - bw/2, sh * 0.45f, cx + bw/2, sh * 0.45f + bh);
         shopBtn = new RectF(cx - bw/2, sh * 0.55f, cx + bw/2, sh * 0.55f + bh);
         settingsBtn = new RectF(cx - bw/2, sh * 0.65f, cx + bw/2, sh * 0.65f + bh);
+
         restartBtn = new RectF(cx - bw/2, sh * 0.76f, cx + bw/2, sh * 0.76f + bh);
         
         cardWidth = sw * 0.88f; cardHeight = sh * 0.32f; cardSpacing = sh * 0.03f; cardStartY = sh * 0.15f;
@@ -164,6 +174,7 @@ public class UIOverlay {
     }
 
     public void setFuelSystem(FuelSystem fs) { this.fuelSystem = fs; }
+
     public void initPrefs(SettingsManager settings) {
         this.settingsManager = settings;
         difficultyLevel = settings.getDifficulty(); gameSpeedLevel = settings.getGameSpeed();
@@ -181,8 +192,24 @@ public class UIOverlay {
         }
     }
 
+    // STATE LEAK ÖNLEME
+    private void resetAllPaintsToSafeState() {
+        Paint[] allPaints = { titlePaint, subtitlePaint, menuBtnBgPaint, menuBtnBorderPaint, menuBtnTextPaint, menuCreditPaint, cardPaint, cardBorderPaint, textPaint, toggleBgPaint, toggleActivePaint, toggleTextPaint };
+        for (Paint p : allPaints) {
+            if (p == null) continue;
+            p.setShader(null); p.setMaskFilter(null); p.setColorFilter(null); p.setAlpha(255); p.setFakeBoldText(false);
+        }
+    }
+
+    public void setState(int newState) {
+        if (currentState != newState) resetAllPaintsToSafeState();
+        currentState = newState;
+    }
+    public int getCurrentState() { return currentState; }
+
     public void renderFull(Canvas c, GameWorld world, ShipRenderer shipRenderer) {
         pulse += 0.04f;
+        
         if (world.getState() == Constants.STATE_PLAYING && !isShopOpen) {
             drawHUD(c, world); drawMilestone(c, world); drawHighScoreProximity(c, world); drawInGameCredits(c, world.getEconomy());
         } else if (world.getState() == Constants.STATE_MENU) {
@@ -192,44 +219,24 @@ public class UIOverlay {
         } else if (world.getState() == Constants.STATE_SETTINGS) {
             drawSettingsScreen(c, world.isGodModeActive());
         }
+
         if (shopOpenAnim > 0.01f) drawShop(c, world.getShipRegistry(), world.getEconomy(), shipRenderer);
     }
 
-    private void drawHighScoreProximity(Canvas c, GameWorld world) {
-        int hs = world.getHighScore();
-        if (hs <= 500) return;
-        float ratio = (float) world.getScore() / hs;
-        if (ratio >= 0.85f && ratio < 1.0f && !recordBroken) {
-            float progress = (ratio - 0.85f) / 0.15f;
-            float lineY = sh * 0.20f * (1f - progress) + sh * 0.10f;
-            int alpha = (int)(60 + 150 * progress);
-            highScoreLinePaint.setColor(Color.argb(alpha, 255, 215, 0)); highScoreLinePaint.setStrokeWidth(3f);
-            float dashOffset = (System.currentTimeMillis() % 1000) / 1000f * 30f;
-            for (float x = -dashOffset; x < sw; x += 40f) c.drawLine(x, lineY, x + 20f, lineY, highScoreLinePaint);
-            highScoreTextPaint.setColor(Color.argb(alpha, 255, 215, 0)); c.drawText("● RECORD", sw - sw * 0.04f, lineY - 10, highScoreTextPaint);
-        } else if (ratio >= 1.0f && !recordBroken) { recordBroken = true; recordBreakParticleTimer = 1.0f; }
-
-        if (recordBroken && recordBreakParticleTimer > 0) {
-            recordBreakParticleTimer -= 0.016f;
-            if (recordBreakParticleTimer > 0) {
-                highScoreTextPaint.setColor(Color.argb((int)(255 * recordBreakParticleTimer), 255, 215, 0));
-                highScoreTextPaint.setTextSize(sw * 0.035f); c.drawText("NEW RECORD!", sw / 2f, sh * 0.18f, highScoreTextPaint);
-                highScoreTextPaint.setTextSize(sw * 0.025f);
-            }
-        }
-    }
-
-    // ─── BURADA DUPLICATE METODU SİLDİM, SADECE 1 TANE var ───
-    public void resetGameOver() { gameOverTime = 0; recordBroken = false; recordBreakParticleTimer = 0; }
-
+    // ═══════════════════════════════════════════════════
+    //  ANA MENÜ
+    // ═══════════════════════════════════════════════════
     private void drawMenu(Canvas c, int highScore, EconomyManager economy) {
         c.drawColor(Color.rgb(5, 7, 14));
+
         menuTitlePaint1.setColor(Color.WHITE); menuTitlePaint1.setTextSize(sw * 0.12f); menuTitlePaint1.setTextAlign(Paint.Align.CENTER); menuTitlePaint1.setFakeBoldText(true); menuTitlePaint1.setStyle(Paint.Style.FILL); menuTitlePaint1.setShader(null); menuTitlePaint1.setAlpha(255);
         float titleY = sh * 0.17f; c.drawText("STELLAR", sw / 2f, titleY, menuTitlePaint1);
+
         menuTitlePaint2.setColor(Color.rgb(80, 195, 255)); menuTitlePaint2.setTextSize(sw * 0.14f); menuTitlePaint2.setTextAlign(Paint.Align.CENTER); menuTitlePaint2.setFakeBoldText(true); menuTitlePaint2.setStyle(Paint.Style.FILL); menuTitlePaint2.setShader(null); menuTitlePaint2.setAlpha(255);
         c.drawText("DRIFT", sw / 2f, titleY + sh * 0.06f, menuTitlePaint2);
+
         menuSubPaint.setColor(Color.argb(100, 170, 180, 200)); menuSubPaint.setTextSize(sw * 0.035f); menuSubPaint.setTextAlign(Paint.Align.CENTER); menuSubPaint.setFakeBoldText(false); menuSubPaint.setStyle(Paint.Style.FILL); menuSubPaint.setShader(null); menuSubPaint.setAlpha(100);
-        c.drawText("v4.5 — Upgrade Edition", sw / 2f, titleY + sh * 0.09f, menuSubPaint);
+        c.drawText("v4.6 — Audio & Juiciness", sw / 2f, titleY + sh * 0.09f, menuSubPaint);
         
         drawMenuButton(c, "▶ PLAY", playBtn, Color.argb(185, 18, 28, 48), Color.argb(150, 70, 170, 255), Color.WHITE);
         drawMenuButton(c, "✦ SHOP", shopBtn, Color.argb(175, 28, 26, 38), Color.argb(140, 195, 165, 38), Color.rgb(228, 198, 55));
@@ -237,7 +244,13 @@ public class UIOverlay {
         
         subtitlePaint.setTextSize(sw * 0.035f); subtitlePaint.setAlpha((int)(150 * (Math.sin(pulse * 1.5) * 0.3 + 0.7))); 
         c.drawText("Destroy asteroids & upgrade ship!", sw / 2f, sh * 0.88f, subtitlePaint);
-        smallPaint.setTextSize(sw * 0.025f); smallPaint.setAlpha(80); c.drawText("v4.5 Mega Fleet", sw / 2f, sh * 0.95f, smallPaint);
+
+        menuCreditPaint.setColor(Color.rgb(195, 175, 45)); menuCreditPaint.setTextSize(sw * 0.05f); menuCreditPaint.setTextAlign(Paint.Align.CENTER); menuCreditPaint.setFakeBoldText(true); menuCreditPaint.setStyle(Paint.Style.FILL); menuCreditPaint.setShader(null); menuCreditPaint.setAlpha(255);
+        int credits = (economy != null) ? economy.getDisplayedCredits() : 0;
+        c.drawText("✦ " + credits, sw / 2f, sh * 0.76f, menuCreditPaint);
+
+        menuSubPaint.setColor(Color.argb(90, 155, 165, 185)); menuSubPaint.setAlpha(90);
+        c.drawText("Best: " + highScore, sw / 2f, sh * 0.81f, menuSubPaint);
     }
 
     private void drawMenuButton(Canvas c, String text, RectF outRect, int bgCol, int borderCol, int textCol) {
@@ -249,8 +262,44 @@ public class UIOverlay {
         c.drawText(text, sw / 2f, outRect.top + outRect.height()/2 + outRect.height()*0.12f, menuBtnTextPaint);
     }
 
+    // ==========================================
+    // SHOP VE OPAK ARKA PLAN ÇİZİMİ
+    // ==========================================
+    private void drawShop(Canvas c, ShipRegistry registry, EconomyManager economy, ShipRenderer renderer) {
+        float alpha = shopOpenAnim;
+
+        // OPAK ARKA PLAN ÇİZİMİ (Alttaki menü yazısı sızmasın diye tam siyah + koyu lacivert)
+        int blackAlpha = (int)(255 * alpha);
+        bgBlackPaint.setColor(Color.argb(blackAlpha, 0, 0, 0));
+        c.drawRect(0, 0, sw, sh, bgBlackPaint);
+
+        int overlayAlpha = (int)(245 * alpha);
+        bgOverlayPaint.setColor(Color.argb(overlayAlpha, 6, 8, 16));
+        c.drawRect(0, 0, sw, sh, bgOverlayPaint);
+
+        totalContentHeight = cardStartY + registry.getShipCount() * (cardHeight + cardSpacing) + 150;
+        c.save(); c.translate(0, -scrollY);
+        
+        accentPaint.setTextSize(sw * 0.08f); accentPaint.setAlpha((int)(255 * alpha)); accentPaint.setShader(null); accentPaint.setColor(Color.WHITE);
+        c.drawText("✦ HANGAR ✦", sw / 2f, sh * 0.08f + scrollY * 0.5f, accentPaint); 
+
+        for (int i = 0; i < registry.getShipCount(); i++) {
+            ShipData ship = registry.getShip(i);
+            float cardY = cardStartY + i * (cardHeight + cardSpacing);
+            if (cardY - scrollY > sh + 50 || cardY + cardHeight - scrollY < -50) continue;
+            drawShipCard(c, ship, i, cardY, alpha, economy, renderer);
+        }
+        c.restore();
+
+        drawCloseButton(c, sw - sw * 0.1f, sh * 0.08f, alpha);
+        drawCreditDisplay(c, economy, alpha);
+    }
+
     private void drawSettingsScreen(Canvas c, boolean godMode) {
-        c.drawRect(0, 0, sw, sh, dimPaint);
+        // OPAK ARKA PLAN ÇİZİMİ
+        bgBlackPaint.setColor(Color.argb(255, 0, 0, 0)); c.drawRect(0, 0, sw, sh, bgBlackPaint);
+        bgOverlayPaint.setColor(Color.argb(245, 8, 10, 20)); c.drawRect(0, 0, sw, sh, bgOverlayPaint);
+
         float cw = sw * 0.9f; float ch = sh * 0.6f;
         float cx = sw * 0.05f; float cy = sh * 0.2f;
 
@@ -283,11 +332,13 @@ public class UIOverlay {
         drawOnOffToggle(c, cx + cw - sw*0.25f, rowY - sh*0.03f, sw*0.2f, sh*0.045f, vibrationEnabled, vibToggleRect);
 
         if (godMode) {
-            smallPaint.setColor(GOLD); smallPaint.setTextSize(sw * 0.035f);
-            c.drawText("★ GOD MODE ACTIVE ★", sw / 2f, cy + ch - 40, smallPaint);
+            float gPulse = (float)(0.5 + 0.5 * Math.sin(System.currentTimeMillis() * 0.005));
+            int gAlpha = (int)(140 + 115 * gPulse);
+            smallPaint.setColor(Color.argb(gAlpha, 255, 215, 0)); smallPaint.setTextSize(sw * 0.035f);
+            c.drawText("★ G.O.D M.O.D.E A.C.T.I.V.E ★", sw / 2f, cy + ch - 40, smallPaint);
         }
 
-        drawCloseButton(c, sw - sw * 0.1f, sh * 0.08f);
+        drawCloseButton(c, sw - sw * 0.1f, sh * 0.08f, 1f);
     }
 
     private void drawSettingsLabel(Canvas c, String label, float x, float y) {
@@ -324,34 +375,14 @@ public class UIOverlay {
         }
     }
 
-    private void drawCloseButton(Canvas c, float cx, float cy) {
-        closeBtnCirclePaint.setColor(Color.argb(180, 200, 50, 50));
+    private void drawCloseButton(Canvas c, float cx, float cy, float alpha) {
+        closeBtnCirclePaint.setColor(Color.argb((int)(180*alpha), 200, 50, 50));
         c.drawCircle(cx, cy, sw * 0.05f, closeBtnCirclePaint);
-        closeBtnXPaint.setColor(WHITE); closeBtnXPaint.setStrokeWidth(5f);
+        closeBtnXPaint.setColor(Color.argb((int)(240*alpha), 255, 255, 255)); 
+        closeBtnXPaint.setStrokeWidth(5f);
         float cross = sw * 0.02f;
         c.drawLine(cx - cross, cy - cross, cx + cross, cy + cross, closeBtnXPaint);
         c.drawLine(cx + cross, cy - cross, cx - cross, cy + cross, closeBtnXPaint);
-    }
-
-    private void drawShop(Canvas c, ShipRegistry registry, EconomyManager economy, ShipRenderer renderer) {
-        float alpha = shopOpenAnim;
-        shopBgPaint.setAlpha((int)(240 * alpha)); c.drawRect(0, 0, sw, sh, shopBgPaint);
-        totalContentHeight = cardStartY + registry.getShipCount() * (cardHeight + cardSpacing) + 150;
-        c.save(); c.translate(0, -scrollY);
-        
-        titlePaint.setTextSize(sw * 0.08f); titlePaint.setAlpha((int)(255 * alpha));
-        c.drawText("✦ HANGAR ✦", sw / 2f, sh * 0.08f + scrollY * 0.5f, titlePaint); 
-
-        for (int i = 0; i < registry.getShipCount(); i++) {
-            ShipData ship = registry.getShip(i);
-            float cardY = cardStartY + i * (cardHeight + cardSpacing);
-            if (cardY - scrollY > sh + 50 || cardY + cardHeight - scrollY < -50) continue;
-            drawShipCard(c, ship, i, cardY, alpha, economy, renderer);
-        }
-        c.restore();
-
-        drawCloseButton(c, sw - sw * 0.1f, sh * 0.08f);
-        drawCreditDisplay(c, economy, alpha);
     }
 
     private void drawShipCard(Canvas c, ShipData ship, int shipIndex, float cardY, float alpha, EconomyManager economy, ShipRenderer renderer) {
@@ -360,15 +391,15 @@ public class UIOverlay {
         boolean isUnlocked = economy.isShipUnlocked(ship.id);
 
         tempRect.set(cx, cardY, cx + cardWidth, cardY + cardHeight);
-        cardPaint.setColor(isSelected ? Color.argb((int)(200 * alpha), 20, 40, 30) : Color.argb((int)(200 * alpha), 25, 25, 35));
-        c.drawRoundRect(tempRect, 24, 24, cardPaint);
+        dimPaint.setColor(isSelected ? Color.argb((int)(200 * alpha), 20, 40, 30) : Color.argb((int)(200 * alpha), 25, 25, 35));
+        c.drawRoundRect(tempRect, 24, 24, dimPaint);
 
         cardBorderPaint.setColor(isSelected ? Color.argb((int)(255 * alpha), 100, 255, 150) : Color.argb((int)(80 * alpha), 100, 150, 200));
         cardBorderPaint.setStrokeWidth(isSelected ? 5f : 2f);
         c.drawRoundRect(tempRect, 24, 24, cardBorderPaint);
 
         float previewX = cx + sw * 0.18f, previewY = cardY + sh * 0.12f;
-        cardPaint.setColor(Color.argb((int)(50 * alpha), 80, 100, 150)); c.drawCircle(previewX, previewY, sw * 0.13f, cardPaint);
+        dimPaint.setColor(Color.argb((int)(50 * alpha), 80, 100, 150)); c.drawCircle(previewX, previewY, sw * 0.13f, dimPaint);
         renderer.drawShip(c, ship, previewX, previewY, 0f, (int)(255 * alpha), (sw/1080f) * 2.2f, false);
 
         float infoX = cx + sw * 0.38f;
@@ -388,15 +419,19 @@ public class UIOverlay {
 
         btnTextPaint.setTextSize(btnH * 0.4f);
         if (isSelected) {
-            cardPaint.setColor(Color.argb((int)(180 * alpha), 40, 160, 80)); c.drawRoundRect(tempBtnRect, btnH/2, btnH/2, cardPaint);
+            dimPaint.setColor(Color.argb((int)(180 * alpha), 40, 160, 80)); c.drawRoundRect(tempBtnRect, btnH/2, btnH/2, dimPaint);
             btnTextPaint.setColor(Color.argb((int)(255 * alpha), 255, 255, 255)); c.drawText("✓ EQUIPPED", btnX + btnW/2, btnY + btnH*0.65f, btnTextPaint);
         } else if (isUnlocked) {
-            cardPaint.setColor(Color.argb((int)(180 * alpha), 60, 120, 180)); c.drawRoundRect(tempBtnRect, btnH/2, btnH/2, cardPaint);
+            dimPaint.setColor(Color.argb((int)(180 * alpha), 60, 120, 180)); c.drawRoundRect(tempBtnRect, btnH/2, btnH/2, dimPaint);
             btnTextPaint.setColor(Color.argb((int)(255 * alpha), 255, 255, 255)); c.drawText("EQUIP", btnX + btnW/2, btnY + btnH*0.65f, btnTextPaint);
         } else {
-            cardPaint.setColor(economy.getCredits() >= ship.price ? Color.argb((int)(200 * alpha), 200, 160, 30) : Color.argb((int)(100 * alpha), 80, 80, 80));
-            c.drawRoundRect(tempBtnRect, btnH/2, btnH/2, cardPaint);
+            dimPaint.setColor(economy.getCredits() >= ship.price ? Color.argb((int)(200 * alpha), 200, 160, 30) : Color.argb((int)(100 * alpha), 80, 80, 80));
+            c.drawRoundRect(tempBtnRect, btnH/2, btnH/2, dimPaint);
             btnTextPaint.setColor(Color.argb((int)(255 * alpha), 255, 255, 255)); c.drawText("🔒 " + ship.price + " ✦", btnX + btnW/2, btnY + btnH*0.65f, btnTextPaint);
+        }
+
+        if (purchaseFlashShipId == ship.id && purchaseFlashTimer > 0) {
+            dimPaint.setColor(Color.argb((int)(purchaseFlashTimer / 0.8f * 60), 255, 220, 50)); c.drawRoundRect(tempRect, 24, 24, dimPaint);
         }
     }
 
@@ -421,6 +456,9 @@ public class UIOverlay {
             tempRect.set(ubtnX, ubtnY, ubtnX + ubtnW, ubtnY + ubtnH); c.drawRoundRect(tempRect, ubtnH/2, ubtnH/2, upgradeBtnPaint);
             smallPaint.setTextSize(sw * 0.020f); smallPaint.setColor(canAfford ? Color.argb((int)(255*alpha), 255, 255, 255) : Color.argb((int)(100*alpha), 160, 160, 170)); smallPaint.setTextAlign(Paint.Align.CENTER);
             c.drawText("+" + cost + "✦", ubtnX + ubtnW/2, ubtnY + ubtnH * 0.7f, smallPaint); smallPaint.setTextAlign(Paint.Align.LEFT);
+            if (upgradeFlashShipId == shipIndex && upgradeFlashStat == statIndex && upgradeFlashTimer > 0) {
+                upgradeBtnPaint.setColor(Color.argb((int)(upgradeFlashTimer / 0.4f * 100), 100, 255, 120)); c.drawRoundRect(tempRect, ubtnH/2, ubtnH/2, upgradeBtnPaint);
+            }
         } else if (isUnlocked && level >= ShipData.MAX_UPGRADE_LEVEL) {
             smallPaint.setTextSize(sw * 0.022f); smallPaint.setColor(Color.argb((int)(120*alpha), Color.red(statColor), Color.green(statColor), Color.blue(statColor))); c.drawText("MAX", barX + barW + sw * 0.02f, y + barH, smallPaint);
         } else {
@@ -474,12 +512,22 @@ public class UIOverlay {
         long el = System.currentTimeMillis() - gameOverTime;
         c.drawRect(0, 0, sw, sh, dimPaint); float cx = sw / 2f;
         accentPaint.setColor(0xFFFF1744); accentPaint.setTextSize(sw * 0.08f); accentPaint.setAlpha(255); c.drawText("GAME OVER", cx, sh * 0.2f, accentPaint);
+
         float cp = Math.min(1f, el / 800f); cp = 1f - (1f - cp) * (1f - cp);
         scorePaint.setColor(WHITE); scorePaint.setTextSize(sw * 0.12f); scorePaint.setAlpha(255); c.drawText(String.valueOf((int)(score * cp)), cx, sh * 0.32f, scorePaint);
         smallPaint.setAlpha(180); c.drawText("SCORE", cx, sh * 0.35f, smallPaint);
-        if (el > 800) { if (score >= hs && score > 0) { accentPaint.setColor(GOLD); accentPaint.setTextSize(sw * 0.04f); accentPaint.setAlpha((int)(255 * (Math.sin(pulse * 3) * 0.15 + 0.85))); c.drawText("★ NEW BEST! ★", cx, sh * 0.41f, accentPaint); } else { smallPaint.setAlpha(140); c.drawText("BEST: " + hs, cx, sh * 0.41f, smallPaint); } }
+
+        if (el > 800) {
+            if (score >= hs && score > 0) { accentPaint.setColor(GOLD); accentPaint.setTextSize(sw * 0.04f); accentPaint.setAlpha((int)(255 * (Math.sin(pulse * 3) * 0.15 + 0.85))); c.drawText("★ NEW BEST! ★", cx, sh * 0.41f, accentPaint); }
+            else { smallPaint.setAlpha(140); c.drawText("BEST: " + hs, cx, sh * 0.41f, smallPaint); }
+        }
+
         if (el > 600) drawStats(c, world, Math.min(1f, (el - 600) / 400f));
-        if (el > BUTTON_DELAY) { float ba = Math.min(1f, (el - BUTTON_DELAY) / 500f); drawMenuButton(c, "▶ PLAY AGAIN", restartBtn, Color.argb((int)(0x33*ba),255,255,255), Color.argb((int)(140*ba),0,229,255), WHITE); subtitlePaint.setAlpha((int)(80 * ba)); c.drawText("or tap anywhere for menu", cx, sh * 0.87f, subtitlePaint); }
+        if (el > BUTTON_DELAY) {
+            float ba = Math.min(1f, (el - BUTTON_DELAY) / 500f);
+            drawMenuButton(c, "▶ PLAY AGAIN", restartBtn, Color.argb((int)(0x33*ba),255,255,255), Color.argb((int)(140*ba),0,229,255), WHITE);
+            subtitlePaint.setAlpha((int)(80 * ba)); c.drawText("or tap anywhere for menu", cx, sh * 0.87f, subtitlePaint);
+        }
     }
 
     private void drawStats(Canvas c, GameWorld w, float a) {
@@ -492,23 +540,33 @@ public class UIOverlay {
 
     public boolean isCloseHit(float tx, float ty) { float cx = sw - sw * 0.1f, cy = sh * 0.08f; return (Math.pow(tx - cx, 2) + Math.pow(ty - cy, 2)) < Math.pow(CLOSE_BTN_HITBOX, 2); }
 
-    public boolean handleSettingsTouch(float tx, float ty, GameWorld world) {
-        if (isCloseHit(tx, ty)) { world.quitToMenu(); return true; }
-        for (int i = 0; i < 3; i++) { if (settingsToggleRects[i].contains(tx, ty)) { difficultyLevel = i; saveSettings(); return true; } }
-        for (int i = 0; i < 3; i++) { if (settingsToggleRects[3+i].contains(tx, ty)) { gameSpeedLevel = i; saveSettings(); return true; } }
-        if (soundToggleRect.contains(tx, ty)) { soundEnabled = !soundEnabled; soundToggleCount++; if (soundToggleCount >= 10) godModeActive = true; saveSettings(); return true; }
-        if (vibToggleRect.contains(tx, ty)) { vibrationEnabled = !vibrationEnabled; vibrationToggleCount++; if (vibrationToggleCount >= 5) godModeActive = false; saveSettings(); return true; }
+    public boolean handleSettingsTouch(float tx, float ty, GameWorld world, SoundManager sm, VibrationManager vm) {
+        if (isCloseHit(tx, ty)) { 
+            world.quitToMenu(); 
+            if (sm != null && sm.isEnabled()) sm.playMenuClick();
+            if (vm != null && vm.isEnabled()) vm.vibrateMenuClick();
+            return true; 
+        }
+        for (int i = 0; i < 3; i++) { if (settingsToggleRects[i].contains(tx, ty)) { difficultyLevel = i; saveSettings(sm); if(sm!=null) sm.playMenuClick(); return true; } }
+        for (int i = 0; i < 3; i++) { if (settingsToggleRects[3+i].contains(tx, ty)) { gameSpeedLevel = i; saveSettings(sm); if(sm!=null) sm.playMenuClick(); return true; } }
+        if (soundToggleRect.contains(tx, ty)) { soundEnabled = !soundEnabled; soundToggleCount++; if (soundToggleCount >= 10) godModeActive = true; saveSettings(sm); if(sm!=null) sm.playMenuClick(); return true; }
+        if (vibToggleRect.contains(tx, ty)) { vibrationEnabled = !vibrationEnabled; vibrationToggleCount++; if (vibrationToggleCount >= 5) godModeActive = false; saveSettings(sm); if(sm!=null) sm.playMenuClick(); return true; }
         return false;
     }
 
-    public boolean handleShopTouch(int action, float tx, float ty, ShipRegistry registry, EconomyManager economy) {
+    public boolean handleShopTouch(int action, float tx, float ty, ShipRegistry registry, EconomyManager economy, SoundManager sm, VibrationManager vm) {
         if (!isShopOpen && shopOpenAnim < 0.01f) return false;
         switch (action) {
             case MotionEvent.ACTION_DOWN: touchDownY = (int) ty; lastTouchY = (int) ty; isDraggingShop = false; return true;
             case MotionEvent.ACTION_MOVE: int dy = lastTouchY - (int) ty; if (Math.abs((int) ty - touchDownY) > 15) isDraggingShop = true; if (isDraggingShop) scrollY = Math.max(0, Math.min(totalContentHeight - sh, scrollY + dy)); lastTouchY = (int) ty; return true;
             case MotionEvent.ACTION_UP:
                 if (!isDraggingShop) {
-                    if (isCloseHit(tx, ty)) { closeShop(); currentState = STATE_MAIN_MENU; return true; }
+                    if (isCloseHit(tx, ty)) { 
+                        closeShop(); 
+                        currentState = STATE_MAIN_MENU; 
+                        if(sm!=null) sm.playMenuClick();
+                        return true; 
+                    }
                     float adjY = ty + scrollY;
                     for (int i = 0; i < registry.getShipCount(); i++) {
                         ShipData ship = registry.getShip(i); float cardY = cardStartY + i * (cardHeight + cardSpacing); float cx = (sw - cardWidth) / 2;
@@ -516,15 +574,28 @@ public class UIOverlay {
                         for (int st = 0; st < ShipData.STAT_COUNT; st++) {
                             RectF ubr = upgradeButtonRects[i][st];
                             if (!ubr.isEmpty() && tx >= ubr.left && tx <= ubr.right && adjY >= ubr.top && adjY <= ubr.bottom) {
-                                if (economy.purchaseUpgrade(ship.id, st)) { economy.syncUpgradesToShipData(registry.getAllShips()); }
+                                if (economy.purchaseUpgrade(ship.id, st)) { 
+                                    economy.syncUpgradesToShipData(registry.getAllShips()); upgradeFlashShipId = i; upgradeFlashStat = st; upgradeFlashTimer = 0.4f; 
+                                    if(sm!=null) sm.playUpgrade(); if(vm!=null) vm.vibrateUpgrade();
+                                } else {
+                                    if(sm!=null) sm.playError(); if(vm!=null) vm.vibrateError();
+                                }
                                 return true;
                             }
                         }
 
                         float btnW = sw * 0.35f, btnH = sh * 0.05f, btnX = cx + cardWidth - btnW - sw * 0.04f, btnY = cardY + cardHeight - btnH - sh * 0.02f;
                         if (tx >= btnX && tx <= btnX + btnW && adjY >= btnY && adjY <= btnY + btnH) {
-                            if (economy.isShipUnlocked(ship.id)) { economy.selectShip(ship.id); registry.selectShip(ship.id); } 
-                            else if (economy.purchaseShip(ship.id, ship.price)) { economy.selectShip(ship.id); registry.selectShip(ship.id); }
+                            if (economy.isShipUnlocked(ship.id)) { 
+                                economy.selectShip(ship.id); registry.selectShip(ship.id); 
+                                if(sm!=null) sm.playMenuClick();
+                            } 
+                            else if (economy.purchaseShip(ship.id, ship.price)) { 
+                                economy.selectShip(ship.id); registry.selectShip(ship.id); economy.syncUpgradesToShipData(registry.getAllShips()); purchaseFlashShipId = ship.id; purchaseFlashTimer = 0.8f; 
+                                if(sm!=null) sm.playPurchase(); if(vm!=null) vm.vibratePurchase();
+                            } else {
+                                if(sm!=null) sm.playError(); if(vm!=null) vm.vibrateError();
+                            }
                             return true;
                         }
                     }
@@ -533,8 +604,18 @@ public class UIOverlay {
         } return true;
     }
 
-    private void saveSettings() { if (settingsManager != null) { settingsManager.setDifficulty(difficultyLevel); settingsManager.setGameSpeed(gameSpeedLevel); settingsManager.setSoundEnabled(soundEnabled); settingsManager.setVibrationEnabled(vibrationEnabled); } }
+    private void saveSettings(SoundManager sm) { 
+        if (settingsManager != null) { 
+            settingsManager.setDifficulty(difficultyLevel); settingsManager.setGameSpeed(gameSpeedLevel); 
+            settingsManager.setSoundEnabled(soundEnabled); settingsManager.setVibrationEnabled(vibrationEnabled); 
+            if(sm!=null) {
+                sm.setEnabled(soundEnabled);
+                if(soundEnabled) sm.startDrone(); else sm.stopDrone();
+            }
+        } 
+    }
 
+    public void resetGameOver() { gameOverTime = 0; recordBroken = false; recordBreakParticleTimer = 0; }
     public void openShop() { isShopOpen = true; scrollY = 0; }
     public void closeShop() { isShopOpen = false; }
     public boolean isShopVisible() { return isShopOpen || shopOpenAnim > 0.01f; }
@@ -545,4 +626,7 @@ public class UIOverlay {
     public boolean isShopHit(float x, float y) { return shopBtn.contains(x, y); }
     public boolean isSettingsHit(float x, float y) { return settingsBtn.contains(x, y); }
     public boolean isRestartHit(float x, float y) { if (gameOverTime > 0 && System.currentTimeMillis() - gameOverTime < BUTTON_DELAY) return false; return restartBtn.contains(x, y); }
+    
+    public boolean isSoundEnabled() { return soundEnabled; }
+    public boolean isVibrationEnabled() { return vibrationEnabled; }
 }
