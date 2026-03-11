@@ -33,63 +33,39 @@ public class StarDust {
 
     public void update(float difficulty) {
         y += speed * difficulty + pullVY; x += pullVX;
-        pullVX *= 0.85f; pullVY *= 0.85f; // Sönümleme
+        pullVX *= 0.85f; pullVY *= 0.85f; 
         pulsePhase += 0.08f; rotation += rotSpeed;
     }
 
-    // Doğal Mıknatıs (Snap Collection) ve Power-Up Magnet Mantığı
     public void applyMagnet(float px, float py, float screenW, boolean hasPowerUp) {
-        float dx = px - x;
-        float dy = py - y;
-        float dist = (float) Math.sqrt(dx * dx + dy * dy);
-        
+        float dx = px - x; float dy = py - y; float dist = (float) Math.sqrt(dx * dx + dy * dy);
         float magnetRadius = hasPowerUp ? (screenW * Constants.MAGNET_RANGE) : (screenW * Constants.NATURAL_MAGNET_RADIUS_RATIO);
         float magnetStrength = hasPowerUp ? Constants.POWERUP_MAGNET_STRENGTH : Constants.NATURAL_MAGNET_STRENGTH;
-        
         if (dist < magnetRadius && dist > 1f) {
-            // Yaklaştıkça üstel artan çekim (Ease-in)
             float pull = magnetStrength * (1f - dist / magnetRadius);
             pull = pull * pull; 
-            
             pullVX += (dx / dist) * pull * magnetRadius * 0.15f;
             pullVY += (dy / dist) * pull * magnetRadius * 0.15f;
-            
-            visualScale = 1f + pull * 0.8f; // Gemiye yaklaşırken büyür ("Geliyor!" hissi)
+            visualScale = 1f + pull * 0.8f; 
             snapGlowAlpha = pull;
         } else {
-            visualScale = 1f;
-            snapGlowAlpha = 0f;
+            visualScale = 1f; snapGlowAlpha = 0f;
         }
     }
 
     public boolean isOffScreen(int sh) { return y > sh + size * 3; }
 
     public void render(Canvas c) {
-        float pulse = (float)(Math.sin(pulsePhase) * 0.25 + 0.75); 
-        float ds = size * pulse * visualScale;
-        
-        // Ekstra Snap Glow
+        float pulse = (float)(Math.sin(pulsePhase) * 0.25 + 0.75); float ds = size * pulse * visualScale;
         if (snapGlowAlpha > 0.05f) {
             glowPaint.setAlpha((int)(150 * snapGlowAlpha));
             c.drawCircle(x, y, ds * 3.5f, glowPaint);
         }
-
-        for (int i = 4; i >= 0; i--) { 
-            float f = (float) i / 4; 
-            glowPaint.setAlpha((int)(22 * (1f - f))); 
-            c.drawCircle(x, y, ds * (1.5f + f * 3f), glowPaint); 
-        }
-        
+        for (int i = 4; i >= 0; i--) { float f = (float) i / 4; glowPaint.setAlpha((int)(22 * (1f - f))); c.drawCircle(x, y, ds * (1.5f + f * 3f), glowPaint); }
         c.save(); c.rotate(rotation, x, y);
         rayPaint.setAlpha(100); rayPaint.setStrokeWidth(size * 0.12f * visualScale);
-        for (int i = 0; i < 4; i++) { 
-            float angle = (float)(i * Math.PI / 2); 
-            float rx = (float)(Math.cos(angle) * ds * 2.2); 
-            float ry = (float)(Math.sin(angle) * ds * 2.2); 
-            c.drawLine(x, y, x + rx, y + ry, rayPaint); 
-        }
+        for (int i = 0; i < 4; i++) { float angle = (float)(i * Math.PI / 2); float rx = (float)(Math.cos(angle) * ds * 2.2); float ry = (float)(Math.sin(angle) * ds * 2.2); c.drawLine(x, y, x + rx, y + ry, rayPaint); }
         c.restore();
-        
         corePaint.setAlpha(255); c.drawCircle(x, y, ds, corePaint);
         centerPaint.setColor(GOLD_LIGHT); centerPaint.setAlpha(220); c.drawCircle(x, y, ds * 0.5f, centerPaint);
         centerPaint.setColor(Color.WHITE); centerPaint.setAlpha(200); c.drawCircle(x, y, ds * 0.22f, centerPaint);

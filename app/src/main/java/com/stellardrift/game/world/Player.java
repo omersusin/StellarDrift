@@ -25,7 +25,6 @@ public class Player {
     private float[] trailX, trailY;
     private int trailIdx;
 
-    // Afterimage Buffer
     private static final int AFTERIMAGE_COUNT = 4;
     private float[] afterX = new float[AFTERIMAGE_COUNT];
     private float[] afterY = new float[AFTERIMAGE_COUNT];
@@ -81,19 +80,14 @@ public class Player {
         wingPaint = new Paint(Paint.ANTI_ALIAS_FLAG); wingPaint.setColor(PURPLE); wingPaint.setStyle(Paint.Style.FILL); wingPaint.setAlpha(140);
         stripePaint = new Paint(Paint.ANTI_ALIAS_FLAG); stripePaint.setColor(CYAN); stripePaint.setStrokeCap(Paint.Cap.ROUND); stripePaint.setStyle(Paint.Style.STROKE);
         shieldPaint = new Paint(Paint.ANTI_ALIAS_FLAG); shieldPaint.setColor(CYAN); shieldPaint.setStyle(Paint.Style.STROKE); shieldPaint.setStrokeWidth(2.5f);
-        
         comboArcPaint = new Paint(Paint.ANTI_ALIAS_FLAG); comboArcPaint.setStyle(Paint.Style.STROKE);
         comboArcPaint.setStrokeWidth(size * 0.15f); comboArcPaint.setStrokeCap(Paint.Cap.ROUND);
     }
 
     public void setComboInfo(int count, float progress) {
-        this.comboCount = count;
-        this.comboProgress = progress;
-        if (count >= 10) comboTier = 4;
-        else if (count >= 6) comboTier = 3;
-        else if (count >= 3) comboTier = 2;
-        else if (count >= 1) comboTier = 1;
-        else comboTier = 0;
+        this.comboCount = count; this.comboProgress = progress;
+        if (count >= 10) comboTier = 4; else if (count >= 6) comboTier = 3;
+        else if (count >= 3) comboTier = 2; else if (count >= 1) comboTier = 1; else comboTier = 0;
     }
 
     private int getTrailColor() {
@@ -115,34 +109,24 @@ public class Player {
         targetBank = Math.max(-Constants.PLAYER_MAX_BANK_ANGLE, Math.min(Constants.PLAYER_MAX_BANK_ANGLE, dx * 2.5f));
         bankAngle += (targetBank - bankAngle) * Constants.PLAYER_BANK_SPEED;
 
-        trailIdx = (trailIdx + 1) % TRAIL_LEN;
-        trailX[trailIdx] = x; trailY[trailIdx] = y;
+        trailIdx = (trailIdx + 1) % TRAIL_LEN; trailX[trailIdx] = x; trailY[trailIdx] = y;
 
-        // Afterimage buffer update
         afterFrameSkip++;
         if (afterFrameSkip % 2 == 0) {
-            afterX[afterIndex] = x;
-            afterY[afterIndex] = y;
-            afterAngle[afterIndex] = bankAngle;
+            afterX[afterIndex] = x; afterY[afterIndex] = y; afterAngle[afterIndex] = bankAngle;
             afterIndex = (afterIndex + 1) % AFTERIMAGE_COUNT;
         }
 
-        glowPulse += 0.06f;
-        engineFlicker = 0.7f + (float)(Math.random() * 0.3);
-
+        glowPulse += 0.06f; engineFlicker = 0.7f + (float)(Math.random() * 0.3);
         if (shielded) { shieldTimer--; shieldPulse += 0.15f; if (shieldTimer <= 0) shielded = false; }
         if (overdrive) { overdriveTimer--; overdrivePulse += 0.12f; if (overdriveTimer <= 0) overdrive = false; }
     }
 
     public void render(Canvas c) {
-        renderTrail(c);
-        renderGlow(c);
-        drawAfterimages(c); // Hayalet izler
-        
+        renderTrail(c); renderGlow(c); drawAfterimages(c);
         c.save(); c.rotate(bankAngle, x, y);
         renderEngine(c, 255); buildShip(); renderShip(c, 255); renderDetails(c, 255);
         c.restore();
-
         if (comboCount > 1) drawComboArc(c);
         if (overdrive) renderOverdrive(c);
         if (shielded) renderShield(c);
@@ -151,21 +135,17 @@ public class Player {
     private void drawAfterimages(Canvas c) {
         for (int i = 0; i < AFTERIMAGE_COUNT; i++) {
             int idx = (afterIndex + i) % AFTERIMAGE_COUNT;
-            float age = (float)(AFTERIMAGE_COUNT - i) / AFTERIMAGE_COUNT; // 1.0 en eski
+            float age = (float)(AFTERIMAGE_COUNT - i) / AFTERIMAGE_COUNT;
             int alpha = (int)(60 * (1f - age));
             if (alpha < 5) continue;
-            
             float scale = 1f - age * 0.2f;
-            
             c.save();
-            c.translate(afterX[idx] - x, afterY[idx] - y); // relative offset
+            c.translate(afterX[idx] - x, afterY[idx] - y);
             c.translate(x, y); c.rotate(afterAngle[idx]); c.scale(scale, scale); c.translate(-x, -y);
-            
-            buildShipAt(afterX[idx], afterY[idx]);
-            renderShipAt(c, afterX[idx], afterY[idx], alpha);
+            buildShipAt(afterX[idx], afterY[idx]); renderShipAt(c, afterX[idx], afterY[idx], alpha);
             c.restore();
         }
-        buildShip(); // restore original path
+        buildShip();
     }
 
     private void drawComboArc(Canvas c) {
@@ -177,14 +157,12 @@ public class Player {
             float pulse = (float)(0.6 + 0.4 * Math.sin(System.currentTimeMillis() * 0.015));
             arcColor = Color.rgb(255, (int)(60 * pulse), (int)(60 * pulse));
         }
-        
         comboArcPaint.setColor(arcColor);
         float r = size * 1.8f;
         comboArcRect.set(x - r, y - r, x + r, y + r);
         c.drawArc(comboArcRect, -90, sweepAngle, false, comboArcPaint);
     }
 
-    // Helper functions for trail and engines...
     private void renderTrail(Canvas c) {
         int trailColor = getTrailColor();
         float baseSize = size * 0.2f + comboTier * size * 0.03f + (overdrive ? size * 0.1f : 0);
@@ -192,8 +170,7 @@ public class Player {
         for (int i = 0; i < TRAIL_LEN; i++) {
             int idx = (trailIdx - i + TRAIL_LEN) % TRAIL_LEN;
             float a = 1f - (i / (float) TRAIL_LEN);
-            trailPaint.setColor(trailColor);
-            trailPaint.setAlpha((int)(baseAlpha * a));
+            trailPaint.setColor(trailColor); trailPaint.setAlpha((int)(baseAlpha * a));
             c.drawCircle(trailX[idx], trailY[idx] + size * 0.5f, baseSize * a, trailPaint);
         }
     }
@@ -246,11 +223,9 @@ public class Player {
     }
 
     private void renderDetails(Canvas c, int alpha) {
-        float s = size;
-        stripePaint.setAlpha((int)(120 * alpha / 255f)); stripePaint.setStrokeWidth(s*0.05f);
+        float s = size; stripePaint.setAlpha((int)(120 * alpha / 255f)); stripePaint.setStrokeWidth(s*0.05f);
         c.drawLine(x, y-s*0.9f, x, y+s*0.15f, stripePaint);
-        cockpitPaint.setAlpha((int)(210 * alpha / 255f)); cockpitRect.set(x-s*0.07f, y-s*0.75f, x+s*0.07f, y-s*0.3f);
-        c.drawOval(cockpitRect, cockpitPaint);
+        cockpitPaint.setAlpha((int)(210 * alpha / 255f)); cockpitRect.set(x-s*0.07f, y-s*0.75f, x+s*0.07f, y-s*0.3f); c.drawOval(cockpitRect, cockpitPaint);
         wingL.reset(); wingL.moveTo(x-s*0.32f, y-s*0.05f); wingL.lineTo(x-s*0.7f, y+s*0.35f); wingL.lineTo(x-s*0.38f, y+s*0.18f); wingL.close();
         wingPaint.setAlpha((int)(140 * alpha / 255f)); c.drawPath(wingL, wingPaint);
         wingR.reset(); wingR.moveTo(x+s*0.32f, y-s*0.05f); wingR.lineTo(x+s*0.7f, y+s*0.35f); wingR.lineTo(x+s*0.38f, y+s*0.18f); wingR.close();

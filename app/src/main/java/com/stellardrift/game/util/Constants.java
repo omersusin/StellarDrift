@@ -90,8 +90,7 @@ public final class Constants {
     public static final int NEAR_MISS_COOLDOWN = 90;
     public static final int NEAR_MISS_FLASH_LIFE = 10;
 
-    // Masterpiece Yeni Sabitleri
-    public static final int GRAZE_CHAIN_WINDOW = 180; // 3 Saniye
+    public static final int GRAZE_CHAIN_WINDOW = 180;
     public static final float NATURAL_MAGNET_RADIUS_RATIO = 0.1f;
     public static final float NATURAL_MAGNET_STRENGTH = 0.15f;
     public static final float POWERUP_MAGNET_STRENGTH = 0.40f;
@@ -132,11 +131,11 @@ public final class Constants {
     public static final int TUTORIAL_MAX_GAMES = 3;
 
     public static final int[] COMBO_TRAIL_COLORS = {
-        0xFF64B5F6, // 0 — blue
-        0xFF66BB6A, // 1-2 — green
-        0xFFAB47BC, // 3-5 — purple
-        0xFFFFD740, // 6-9 — gold
-        0xFFFF6D00  // 10+ — orange
+        0xFF64B5F6,
+        0xFF66BB6A,
+        0xFFAB47BC,
+        0xFFFFD740,
+        0xFFFF6D00 
     };
 
     private Constants() {}
