@@ -32,14 +32,10 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback {
     private RadialGradient vignetteNormal, vignetteDanger;
     private float currentDanger;
 
-    // Pause UI
     private Paint pauseDimPaint, pauseTitlePaint, pauseBtnPaint, pauseBtnOutPaint, pauseBtnTextPaint;
     private RectF pauseResumeBtn, pauseQuitBtn, pauseBtn;
 
-    // Transition
     private Paint transitionPaint;
-
-    // Tutorial
     private Paint tutorialPaint, tutorialBgPaint;
 
     public GameView(Context context) {
@@ -146,14 +142,14 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback {
         }
     }
 
-    private void handlePauseTap(float x, float y) {
-        if (pauseResumeBtn.contains(x, y)) gameWorld.resumeGame();
-        else if (pauseQuitBtn.contains(x, y)) gameWorld.quitToMenu();
-    }
-
     public void updateGame() {
-        if (background != null && gameWorld != null) background.update(gameWorld.getDifficulty(), gameWorld.getTempoPhase());
-        if (gameWorld != null) gameWorld.update(joystick.getDirX(), joystick.getDirY(), joystick.getMagnitude());
+        // DÜZELTME: dt (0.016f) parametresini de ekledik
+        if (background != null && gameWorld != null) {
+            background.update(gameWorld.getDifficulty(), gameWorld.getTempoPhase(), 0.016f);
+        }
+        if (gameWorld != null) {
+            gameWorld.update(joystick.getDirX(), joystick.getDirY(), joystick.getMagnitude());
+        }
     }
 
     public void drawGame(Canvas canvas) {
@@ -212,7 +208,7 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback {
         pauseBtnPaint.setColor(0x25FFFFFF);
         canvas.drawRoundRect(pauseBtn, 8, 8, pauseBtnPaint);
         pauseBtnTextPaint.setTextSize(screenW * 0.03f); pauseBtnTextPaint.setAlpha(150);
-        canvas.drawText("⏸", pauseBtn.centerX(), pauseBtn.centerY() + screenW * 0.01f, pauseBtnTextPaint);
+        canvas.drawText("II", pauseBtn.centerX(), pauseBtn.centerY() + screenW * 0.01f, pauseBtnTextPaint);
     }
 
     private void drawPauseScreen(Canvas canvas) {
@@ -223,11 +219,11 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback {
         canvas.drawRoundRect(pauseResumeBtn, rad, rad, pauseBtnPaint);
         pauseBtnOutPaint.setColor(0xFF00E5FF); canvas.drawRoundRect(pauseResumeBtn, rad, rad, pauseBtnOutPaint);
         pauseBtnTextPaint.setAlpha(255); pauseBtnTextPaint.setTextSize(screenW * 0.04f);
-        canvas.drawText("▶  RESUME", pauseResumeBtn.centerX(), pauseResumeBtn.centerY() + screenW * 0.014f, pauseBtnTextPaint);
+        canvas.drawText("RESUME", pauseResumeBtn.centerX(), pauseResumeBtn.centerY() + screenW * 0.014f, pauseBtnTextPaint);
 
         canvas.drawRoundRect(pauseQuitBtn, rad, rad, pauseBtnPaint);
         pauseBtnOutPaint.setColor(0xFF7C4DFF); canvas.drawRoundRect(pauseQuitBtn, rad, rad, pauseBtnOutPaint);
-        canvas.drawText("✕  QUIT", pauseQuitBtn.centerX(), pauseQuitBtn.centerY() + screenW * 0.014f, pauseBtnTextPaint);
+        canvas.drawText("QUIT", pauseQuitBtn.centerX(), pauseQuitBtn.centerY() + screenW * 0.014f, pauseBtnTextPaint);
     }
 
     private void drawTutorial(Canvas canvas) {
@@ -242,7 +238,7 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback {
         if (gameWorld.isFirstStarDustSeen() && frame < 400 && frame > 120) {
             float alpha = Math.min(1f, Math.max(0, (frame - 120) / 30f));
             if (frame > 350) alpha = (400 - frame) / 50f;
-            drawTutorialText(canvas, "✦ Collect stardust for points!", screenH * 0.5f, alpha);
+            drawTutorialText(canvas, "Collect stardust for points!", screenH * 0.5f, alpha);
         }
 
         if (gameWorld.isFirstNearMiss() && frame > 200) {

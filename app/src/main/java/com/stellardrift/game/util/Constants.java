@@ -79,6 +79,7 @@ public final class Constants {
     public static final String KEY_DIFFICULTY = "difficulty";
     public static final String KEY_VIBRATION = "vibration";
     public static final String KEY_SOUND = "sound";
+    public static final String KEY_GAME_SPEED = "gameSpeed"; // DÜZELTİLDİ
     public static final String KEY_GAMES_PLAYED = "gamesPlayed";
 
     public static final int COMBO_TIMEOUT = 120;
@@ -122,16 +123,15 @@ public final class Constants {
     public static final float MAGNET_RANGE = 0.35f;
     public static final float SLOWMO_FACTOR = 0.5f;
 
+    public static final int POPUP_LIFETIME = 30;
+
     public static final float TRANSITION_SPEED_IN = 0.04f;
     public static final float TRANSITION_SPEED_OUT = 0.05f;
 
     public static final int TUTORIAL_MAX_GAMES = 3;
 
-    // Hit Stall
     public static final float HIT_STALL_DURATION = 0.033f;
     public static final float HIT_STALL_TIME_SCALE = 0.7f;
-
-    // Spawn Bias
     public static final float SPAWN_BIAS_STRENGTH = 0.6f;
 
     public static final int[] COMBO_TRAIL_COLORS = {

@@ -48,7 +48,7 @@ public class GameWorld {
     private String milestoneText;
     private int milestoneTimer;
     
-    // Yönsel Tehlike [Top, Bottom, Left, Right]
+    // Directional Dangers
     private float dangerLevel;
     private float[] directionalDangers = new float[4]; 
     
@@ -70,7 +70,6 @@ public class GameWorld {
     private int vibToggleClicks = 0;
     private boolean isGodMode = false;
 
-    // Endgame Polish
     private float cosmicBreathTimer = 0f;
     private float cosmicBreathValue = 0f;
     private float hitStallTimer = 0f;
@@ -103,7 +102,7 @@ public class GameWorld {
     }
 
     public void update(float joyDirX, float joyDirY, float joyMag) {
-        float dt = 0.016f; // Yaklaşık 60fps delta time
+        float dt = 0.016f; 
 
         updateCosmicBreath(dt);
         updatePopups(dt);
@@ -126,13 +125,11 @@ public class GameWorld {
         float gameSpeedMult = settings.getGameSpeedMultiplier();
         difficulty = Math.min(Constants.MAX_DIFFICULTY, 1f + frameCount * Constants.DIFFICULTY_RATE);
 
-        // Player RAW hızda çalışır, Hit Stall'dan etkilenmez
         player.update(joyDirX, joyDirY, joyMag, dt);
         float comboProg = comboTimer > 0 ? (float)comboTimer / Constants.COMBO_TIMEOUT : 0f;
         player.setComboInfo(combo, comboProg);
         updateSpawnBias(dt, joyDirX, joyDirY, joyMag);
         
-        // Diğer sistemler Hit Stall'dan etkilenir (zaman bükülmesi hissi)
         if (hitStallTimer <= 0) {
             updateTimers(); 
             updateTempo(); 
@@ -156,12 +153,10 @@ public class GameWorld {
         cosmicBreathTimer += dt;
         cosmicBreathValue = (float) Math.sin(cosmicBreathTimer * Math.PI * 2.0 / 4.0) * 0.5f + 0.5f;
     }
-    public float getCosmicBreath() { return cosmicBreathValue; }
 
     private void updateSpawnBias(float dt, float dirX, float dirY, float mag) {
         if (mag > 0.2f) {
             float targetAngle = (float) Math.atan2(dirY, dirX);
-            // Angle lerp
             float diff = targetAngle - spawnBiasAngle;
             while (diff > Math.PI) diff -= 2 * Math.PI;
             while (diff < -Math.PI) diff += 2 * Math.PI;
@@ -181,7 +176,7 @@ public class GameWorld {
             if (dist > threatRadius) continue;
             
             float intensity = 1f - (dist / threatRadius);
-            intensity *= intensity; // Quadratic falloff
+            intensity *= intensity; 
 
             if (dy < -Math.abs(dx) * 0.5f) tTop = Math.max(tTop, intensity);
             if (dy > Math.abs(dx) * 0.5f)  tBot = Math.max(tBot, intensity);
@@ -195,10 +190,8 @@ public class GameWorld {
         directionalDangers[2] += (tLeft - directionalDangers[2]) * smooth;
         directionalDangers[3] += (tRight - directionalDangers[3]) * smooth;
         
-        dangerLevel = Math.max(Math.max(directionalDangers[0], directionalDangers[1]), 
-                               Math.max(directionalDangers[2], directionalDangers[3]));
+        dangerLevel = Math.max(Math.max(directionalDangers[0], directionalDangers[1]), Math.max(directionalDangers[2], directionalDangers[3]));
     }
-    public float[] getDirectionalDangers() { return directionalDangers; }
 
     private void updateTimers() {
         if (nearMissCooldown > 0) nearMissCooldown--;
@@ -284,7 +277,7 @@ public class GameWorld {
         StarDust sd = new StarDust(screenW, screenH);
         if (Math.random() <= Constants.SPAWN_BIAS_STRENGTH) {
             float aheadDist = 150f + (float)(Math.random() * 150f);
-            float angleOffset = (float)((Math.random() - 0.5) * Math.toRadians(60)); // ±30 derece koni
+            float angleOffset = (float)((Math.random() - 0.5) * Math.toRadians(60));
             float finalAngle = spawnBiasAngle + angleOffset;
             float spawnX = player.getX() + (float) Math.cos(finalAngle) * aheadDist;
             spawnX = Math.max(20, Math.min(screenW - 20, spawnX));
@@ -297,10 +290,8 @@ public class GameWorld {
         int count = Constants.STARDUST_CHAIN_MIN + (int)(Math.random() * (Constants.STARDUST_CHAIN_MAX - Constants.STARDUST_CHAIN_MIN + 1));
         if (isGodMode) count += 3;
         chainTarget = count; chainCounter = 0; chainActive = true;
-        
         float startX = spawnBiasedStarDust().getX();
         float endX = spawnBiasedStarDust().getX();
-        
         for (int i = 0; i < count; i++) {
             float t = (float) i / (count - 1);
             float cx = startX + (endX - startX) * t;
@@ -356,7 +347,7 @@ public class GameWorld {
     }
 
     private void collectStarDust(StarDust s) {
-        hitStallTimer = Constants.HIT_STALL_DURATION; // JUICE: Zaman dilasyonu
+        hitStallTimer = Constants.HIT_STALL_DURATION; 
         
         combo++; comboTimer = Constants.COMBO_TIMEOUT; if (combo > maxCombo) maxCombo = combo;
         int pts = Constants.STARDUST_SCORE, cm = 1 + (int)(combo * Constants.COMBO_MULTIPLIER);
@@ -428,7 +419,7 @@ public class GameWorld {
         magnetActive = false; slowmoActive = false; doubleActive = false; magnetTimer = 0; slowmoTimer = 0; doubleTimer = 0;
         powerUpSpawnTimer = 0; overdriveTriggered = false; riskWindowActive = false; riskWindowTimer = 0; freezeTimer = 0; killerAsteroid = null; shockwaveActive = false; shakeIntensity = 0; shakeX = 0; shakeY = 0;
         orbsCollected = 0; nearMissCount = 0; maxCombo = 0; lastMilestone = 0; milestoneText = null; milestoneTimer = 0; dangerLevel = 0; tempoPhase = Constants.TEMPO_CALM; tempoTimer = Constants.TEMPO_CALM_DURATION;
-        chainActive = false; chainCounter = 0; chainTarget = 0; firstStarDustSeen = false; firstNearMiss = false; transitionAlpha = 1f; transitioningIn = true; grazeChainCount = 0; grazeChainTimer = 0; hitStallTimer = 0;
+        chainActive = false; chainCounter = 0; chainTarget = 0; firstStarDustSeen = false; firstNearMiss = false; transitionAlpha = 1f; transitioningIn = true; grazeChainCount = 0; grazeChainTimer = 0; hitStallTimer = 0f; spawnBiasAngle = 0f;
         startTime = System.currentTimeMillis(); asteroids.clear(); starDusts.clear(); particles.clear(); powerUps.clear(); popups.clear(); spawnWarnings.clear(); nearMissFlashes.clear(); ringBursts.clear(); player.reset();
         
         if (isGodMode) popups.add(new ScorePopup(screenW/2f, screenH/2f, "GOD MODE ENABLED", 0xFFFFD740, 2f));
@@ -451,5 +442,5 @@ public class GameWorld {
         if (isGodMode) { vibToggleClicks++; if (vibToggleClicks >= 5) { isGodMode = false; soundToggleClicks = 0; vibToggleClicks = 0; sound.playClick(); } }
     }
 
-    public int getState() { return state; } public int getScore() { return score; } public int getHighScore() { return settings.getHighScore(); } public float getDifficulty() { return difficulty; } public Player getPlayer() { return player; } public List<Asteroid> getAsteroids() { return asteroids; } public List<StarDust> getStarDusts() { return starDusts; } public List<Particle> getParticles() { return particles; } public List<PowerUp> getPowerUps() { return powerUps; } public List<ScorePopup> getPopups() { return popups; } public SettingsManager getSettings() { return settings; } public int getCombo() { return combo; } public boolean isMagnetActive() { return magnetActive; } public boolean isSlowmoActive() { return slowmoActive; } public boolean isDoubleActive() { return doubleActive; } public int getMagnetTimer() { return magnetTimer; } public int getSlowmoTimer() { return slowmoTimer; } public int getDoubleTimer() { return doubleTimer; } public float getShakeX() { return shakeX; } public float getShakeY() { return shakeY; } public int getOrbsCollected() { return orbsCollected; } public int getNearMissCount() { return nearMissCount; } public int getMaxCombo() { return maxCombo; } public long getSurvivalTime() { return startTime == 0 ? 0 : (System.currentTimeMillis() - startTime) / 1000; } public int getTempoPhase() { return tempoPhase; } public boolean isRiskWindowActive() { return riskWindowActive; } public int getRiskWindowTimer() { return riskWindowTimer; } public boolean isFreezing() { return freezeTimer > 0; } public Asteroid getKillerAsteroid() { return killerAsteroid; } public boolean isShockwaveActive() { return shockwaveActive; } public float getShockwaveX() { return shockwaveX; } public float getShockwaveY() { return shockwaveY; } public float getShockwaveRadius() { return shockwaveRadius; } public float getShockwaveAlpha() { return shockwaveAlpha; } public float getDangerLevel() { return dangerLevel; } public float[] getDirectionalDangers() { return directionalDangers; } public String getMilestoneText() { return milestoneText; } public int getMilestoneTimer() { return milestoneTimer; } public List<float[]> getSpawnWarnings() { return spawnWarnings; } public List<float[]> getNearMissFlashes() { return nearMissFlashes; } public List<float[]> getRingBursts() { return ringBursts; } public float getTransitionAlpha() { return transitionAlpha; } public boolean isFirstStarDustSeen() { return firstStarDustSeen; } public boolean isFirstNearMiss() { return firstNearMiss; } public int getFrameCount() { return frameCount; } public void releaseResources() { if (sound != null) sound.release(); }
+    public int getState() { return state; } public int getScore() { return score; } public int getHighScore() { return settings.getHighScore(); } public float getDifficulty() { return difficulty; } public Player getPlayer() { return player; } public List<Asteroid> getAsteroids() { return asteroids; } public List<StarDust> getStarDusts() { return starDusts; } public List<Particle> getParticles() { return particles; } public List<PowerUp> getPowerUps() { return powerUps; } public List<ScorePopup> getPopups() { return popups; } public SettingsManager getSettings() { return settings; } public int getCombo() { return combo; } public boolean isMagnetActive() { return magnetActive; } public boolean isSlowmoActive() { return slowmoActive; } public boolean isDoubleActive() { return doubleActive; } public int getMagnetTimer() { return magnetTimer; } public int getSlowmoTimer() { return slowmoTimer; } public int getDoubleTimer() { return doubleTimer; } public float getShakeX() { return shakeX; } public float getShakeY() { return shakeY; } public int getOrbsCollected() { return orbsCollected; } public int getNearMissCount() { return nearMissCount; } public int getMaxCombo() { return maxCombo; } public long getSurvivalTime() { return startTime == 0 ? 0 : (System.currentTimeMillis() - startTime) / 1000; } public int getTempoPhase() { return tempoPhase; } public boolean isRiskWindowActive() { return riskWindowActive; } public int getRiskWindowTimer() { return riskWindowTimer; } public boolean isFreezing() { return freezeTimer > 0; } public Asteroid getKillerAsteroid() { return killerAsteroid; } public boolean isShockwaveActive() { return shockwaveActive; } public float getShockwaveX() { return shockwaveX; } public float getShockwaveY() { return shockwaveY; } public float getShockwaveRadius() { return shockwaveRadius; } public float getShockwaveAlpha() { return shockwaveAlpha; } public float getDangerLevel() { return dangerLevel; } public float[] getDirectionalDangers() { return directionalDangers; } public String getMilestoneText() { return milestoneText; } public int getMilestoneTimer() { return milestoneTimer; } public List<float[]> getSpawnWarnings() { return spawnWarnings; } public List<float[]> getNearMissFlashes() { return nearMissFlashes; } public List<float[]> getRingBursts() { return ringBursts; } public float getTransitionAlpha() { return transitionAlpha; } public boolean isFirstStarDustSeen() { return firstStarDustSeen; } public boolean isFirstNearMiss() { return firstNearMiss; } public int getFrameCount() { return frameCount; } public float getCosmicBreath() { return cosmicBreathValue; } public void releaseResources() { if (sound != null) sound.release(); }
 }

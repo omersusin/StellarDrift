@@ -68,6 +68,7 @@ public class SpaceBackground {
         return stars;
     }
 
+    // DÜZELTİLDİ: Sadece bunu kullanıyoruz, GameView'dan bu çağrılacak
     public void update(float difficulty, int tempo, float dt) {
         twinklePhase += 0.03f;
         tempoPhase = tempo;
