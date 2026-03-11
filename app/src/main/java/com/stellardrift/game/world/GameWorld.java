@@ -62,6 +62,10 @@ public class GameWorld {
     private float transitionAlpha;
     private boolean transitioningIn;
 
+    // Easter Egg
+    private int soundToggleClicks = 0;
+    private boolean isGodMode = false;
+
     private static final int[] MILESTONES = {1000, 2500, 5000, 10000, 25000, 50000};
 
     public GameWorld(int sw, int sh, Context ctx) {
@@ -137,7 +141,13 @@ public class GameWorld {
     }
 
     private void updateTransition() { if (transitioningIn) { transitionAlpha -= Constants.TRANSITION_SPEED_IN; if (transitionAlpha <= 0) { transitionAlpha = 0; transitioningIn = false; } } }
+    
     private void updateTempo() {
+        if (isGodMode) {
+            tempoPhase = Constants.TEMPO_REWARD;
+            return;
+        }
+
         if (frameCount < Constants.WARMUP_FRAMES) return;
         tempoTimer--;
         if (tempoTimer <= 0) {
@@ -158,21 +168,35 @@ public class GameWorld {
         int baseSpawn = settings.getSpawnInterval();
         float tMult = getTempoSpawnMult();
 
-        if (!warmup) {
+        // Asteroids - Easter Egg: Disable in God Mode
+        if (!warmup && !isGodMode) {
             int astInt = Math.max(5, (int)(baseSpawn / (difficulty * tMult)));
             if (frameCount % astInt == 0) { Asteroid a = new Asteroid(screenW, screenH, player.getX()); asteroids.add(a); spawnWarnings.add(new float[]{a.getX(), 20}); }
         }
 
+        // StarDust
         float sdMult = getTempoStarDustMult();
+        if (isGodMode) sdMult = 5f; // Extra crazy spawn
+        
         int sdInt = Math.max(8, (int)(Constants.STARDUST_SPAWN_INTERVAL / (difficulty * sdMult)));
-        if (frameCount % sdInt == 0) { if (Math.random() < Constants.STARDUST_CHAIN_CHANCE && !chainActive) spawnStarDustChain(); else starDusts.add(new StarDust(screenW, screenH)); }
+        if (frameCount % sdInt == 0) { 
+            if (Math.random() < Constants.STARDUST_CHAIN_CHANCE && !chainActive) spawnStarDustChain(); 
+            else starDusts.add(new StarDust(screenW, screenH)); 
+        }
 
+        // Power-ups
         powerUpSpawnTimer++;
-        if (powerUpSpawnTimer >= Constants.POWERUP_SPAWN_INTERVAL) { powerUpSpawnTimer = 0; powerUps.add(new PowerUp(screenW, screenH, (int)(Math.random() * 4))); }
+        int pInterval = isGodMode ? Constants.POWERUP_SPAWN_INTERVAL / 2 : Constants.POWERUP_SPAWN_INTERVAL;
+        if (powerUpSpawnTimer >= pInterval) { 
+            powerUpSpawnTimer = 0; 
+            powerUps.add(new PowerUp(screenW, screenH, (int)(Math.random() * 4))); 
+        }
     }
 
     private void spawnStarDustChain() {
         int count = Constants.STARDUST_CHAIN_MIN + (int)(Math.random() * (Constants.STARDUST_CHAIN_MAX - Constants.STARDUST_CHAIN_MIN + 1));
+        if (isGodMode) count += 3;
+        
         chainTarget = count; chainCounter = 0; chainActive = true;
         float startX = screenW * 0.15f + (float)(Math.random() * screenW * 0.7f), endX = screenW * 0.15f + (float)(Math.random() * screenW * 0.7f);
         for (int i = 0; i < count; i++) {
@@ -206,7 +230,7 @@ public class GameWorld {
         Iterator<PowerUp> pui = powerUps.iterator();
         while (pui.hasNext()) { PowerUp pu = pui.next(); if (RectF.intersects(pb, pu.getBounds())) { collectPowerUp(pu); pui.remove(); } }
 
-        if (player.isShielded()) return;
+        if (player.isShielded() || isGodMode) return; // God mode invincible!
 
         for (Asteroid a : asteroids) {
             if (RectF.intersects(pb, a.getBounds())) { onPlayerHit(a, px, py); return; }
@@ -229,7 +253,8 @@ public class GameWorld {
     private void collectStarDust(StarDust s) {
         combo++; comboTimer = Constants.COMBO_TIMEOUT; if (combo > maxCombo) maxCombo = combo;
         int pts = Constants.STARDUST_SCORE, cm = 1 + (int)(combo * Constants.COMBO_MULTIPLIER);
-        if (doubleActive) cm *= 2; if (riskWindowActive) pts = (int)(pts * Constants.RISK_WINDOW_MULT);
+        if (doubleActive || isGodMode) cm *= 2; 
+        if (riskWindowActive) pts = (int)(pts * Constants.RISK_WINDOW_MULT);
         int fp = pts * cm; score += fp; orbsCollected++;
 
         if (chainActive) {
@@ -282,7 +307,7 @@ public class GameWorld {
         sound.playExplosion(); vibration.vibrateExplosion(); shakeIntensity = Constants.SHAKE_INTENSITY; shockwaveActive = true; shockwaveX = px; shockwaveY = py; shockwaveRadius = 0; shockwaveAlpha = 1f; freezeTimer = Constants.FREEZE_FRAMES;
     }
 
-    private void triggerGameOver() { state = Constants.STATE_GAME_OVER; settings.setHighScore(score); settings.incrementGamesPlayed(); sound.playGameOver(); }
+    private void triggerGameOver() { state = Constants.STATE_GAME_OVER; settings.setHighScore(score); settings.incrementGamesPlayed(); sound.playGameOver(); isGodMode = false; soundToggleClicks = 0; }
     private void updateShockwave() { if (!shockwaveActive) return; shockwaveRadius += 25; float maxR = Math.max(screenW, screenH) * 0.8f; shockwaveAlpha = 1f - (shockwaveRadius / maxR); if (shockwaveAlpha <= 0) { shockwaveActive = false; shockwaveAlpha = 0; } }
     private void checkMilestone() { for (int m : MILESTONES) { if (score >= m && lastMilestone < m) { lastMilestone = m; milestoneText = m >= 10000 ? "★ " + (m/1000) + "K ★" : "★ " + m + " ★"; milestoneTimer = 90; spawnParticles(screenW / 2f, screenH * 0.3f, 25, 0xFFFFD740); vibration.vibrateCollect(); break; } } }
     private void updateDangerLevel() { float minDist = Float.MAX_VALUE; float px = player.getX(), py = player.getY(); for (Asteroid a : asteroids) { float dx = px - a.getX(), dy = py - a.getY(), dist = (float) Math.sqrt(dx * dx + dy * dy) - a.getSize(); if (dist < minDist) minDist = dist; } dangerLevel = Math.max(0, Math.min(1f, 1f - minDist / (screenW * 0.2f))); }
@@ -298,6 +323,10 @@ public class GameWorld {
         orbsCollected = 0; nearMissCount = 0; maxCombo = 0; lastMilestone = 0; milestoneText = null; milestoneTimer = 0; dangerLevel = 0; tempoPhase = Constants.TEMPO_CALM; tempoTimer = Constants.TEMPO_CALM_DURATION;
         chainActive = false; chainCounter = 0; chainTarget = 0; firstStarDustSeen = false; firstNearMiss = false; transitionAlpha = 1f; transitioningIn = true; grazeChainCount = 0; grazeChainTimer = 0;
         startTime = System.currentTimeMillis(); asteroids.clear(); starDusts.clear(); particles.clear(); powerUps.clear(); popups.clear(); spawnWarnings.clear(); nearMissFlashes.clear(); ringBursts.clear(); player.reset();
+        
+        if (isGodMode) {
+            popups.add(new ScorePopup(screenW/2f, screenH/2f, "GOD MODE ENABLED", 0xFFFFD740));
+        }
     }
     public void pauseGame() { if (state == Constants.STATE_PLAYING) state = Constants.STATE_PAUSED; }
     public void resumeGame() { if (state == Constants.STATE_PAUSED) state = Constants.STATE_PLAYING; }
@@ -306,7 +335,20 @@ public class GameWorld {
     public void closeSettings() { state = Constants.STATE_MENU; }
     public void cycleDifficulty() { settings.cycleDifficulty(); sound.playClick(); vibration.vibrateClick(); }
     public void cycleGameSpeed() { settings.cycleGameSpeed(); sound.playClick(); vibration.vibrateClick(); }
-    public void toggleSound() { settings.toggleSound(); sound.setEnabled(settings.isSoundEnabled()); if (settings.isSoundEnabled()) sound.playClick(); }
+    
+    public void toggleSound() { 
+        settings.toggleSound(); 
+        sound.setEnabled(settings.isSoundEnabled()); 
+        if (settings.isSoundEnabled()) sound.playClick(); 
+        
+        // Easter Egg Logic
+        soundToggleClicks++;
+        if (soundToggleClicks == 10) {
+            isGodMode = true;
+            vibration.vibrateExplosion(); // 10 kere basıldığını belli et
+        }
+    }
+    
     public void toggleVibration() { settings.toggleVibration(); vibration.setEnabled(settings.isVibrationEnabled()); vibration.vibrateClick(); }
 
     public int getState() { return state; } public int getScore() { return score; } public int getHighScore() { return settings.getHighScore(); } public float getDifficulty() { return difficulty; } public Player getPlayer() { return player; } public List<Asteroid> getAsteroids() { return asteroids; } public List<StarDust> getStarDusts() { return starDusts; } public List<Particle> getParticles() { return particles; } public List<PowerUp> getPowerUps() { return powerUps; } public List<ScorePopup> getPopups() { return popups; } public SettingsManager getSettings() { return settings; } public int getCombo() { return combo; } public boolean isMagnetActive() { return magnetActive; } public boolean isSlowmoActive() { return slowmoActive; } public boolean isDoubleActive() { return doubleActive; } public int getMagnetTimer() { return magnetTimer; } public int getSlowmoTimer() { return slowmoTimer; } public int getDoubleTimer() { return doubleTimer; } public float getShakeX() { return shakeX; } public float getShakeY() { return shakeY; } public int getOrbsCollected() { return orbsCollected; } public int getNearMissCount() { return nearMissCount; } public int getMaxCombo() { return maxCombo; } public long getSurvivalTime() { return startTime == 0 ? 0 : (System.currentTimeMillis() - startTime) / 1000; } public int getTempoPhase() { return tempoPhase; } public boolean isRiskWindowActive() { return riskWindowActive; } public int getRiskWindowTimer() { return riskWindowTimer; } public boolean isFreezing() { return freezeTimer > 0; } public Asteroid getKillerAsteroid() { return killerAsteroid; } public boolean isShockwaveActive() { return shockwaveActive; } public float getShockwaveX() { return shockwaveX; } public float getShockwaveY() { return shockwaveY; } public float getShockwaveRadius() { return shockwaveRadius; } public float getShockwaveAlpha() { return shockwaveAlpha; } public float getDangerLevel() { return dangerLevel; } public String getMilestoneText() { return milestoneText; } public int getMilestoneTimer() { return milestoneTimer; } public List<float[]> getSpawnWarnings() { return spawnWarnings; } public List<float[]> getNearMissFlashes() { return nearMissFlashes; } public List<float[]> getRingBursts() { return ringBursts; } public float getTransitionAlpha() { return transitionAlpha; } public boolean isFirstStarDustSeen() { return firstStarDustSeen; } public boolean isFirstNearMiss() { return firstNearMiss; } public int getFrameCount() { return frameCount; } public void releaseResources() { if (sound != null) sound.release(); }
