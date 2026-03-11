@@ -35,7 +35,9 @@ jobs:
         run: chmod +x gradlew
 
       - name: Decode Keystore
-        run: echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > stellar-drift.jks
+        run: |
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > stellar-drift.jks
+          keytool -list -keystore stellar-drift.jks -storepass "${{ secrets.KEYSTORE_PASSWORD }}" || echo "Keystore check failed"
 
       - name: Build Debug APK
         run: ./gradlew assembleDebug
@@ -70,28 +72,33 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
-          name: "Stellar Drift ${{ github.ref_name }}"
+          name: "Stellar Drift ${{ github.ref_name }} — The Masterpiece Update"
           body: |
             ## 🚀 Stellar Drift ${{ github.ref_name }}
-            
+
             **An endless space survival game — made entirely by AI.**
             
+            This is the ultimate **"Masterpiece Update"**, bringing massive "Game-Feel" (Juice) improvements, micro-animations, and visual overhauls entirely via the Canvas API.
+
             ### ✨ What's New
-            - 🎨 Custom app icon — programmatic spaceship logo
-            - 🕹️ Virtual joystick — full directional control
-            - 🚀 Free movement — fly anywhere on screen
-            - ⚡ Game speed setting — Slow / Normal / Fast
-            - 🌊 Tempo system — Calm, Pressure, Reward phases
-            - 💥 Freeze frame + shockwave on death
-            - 🔥 Overdrive at combo x8
-            - 🛡️ 4 power-ups: Magnet, Slow-Mo, Double, Shield
-            - 📊 Score milestones with celebrations
-            - 🔊 100% programmatic audio — zero files
-            - 🎨 100% Canvas API graphics — zero images
-            
+            - 🎯 **Natural Snap Collection:** Stardust is now magnetically pulled to your ship when very close, creating a satisfying "snap" feeling.
+            - 📈 **High Score Proximity Line:** As you approach your best score, a golden line descends from the top of the screen to build tension.
+            - ⏱️ **Combo Decay Arc:** A visual ring around your ship shows exactly how much time is left to chain your combo.
+            - 💥 **Ring Bursts:** Collecting items now triggers a satisfying outward particle ring expansion.
+            - ⚡ **Graze Chain:** String together multiple near-misses for exponentially multiplying points and "DAREDEVIL" / "INSANE" popups.
+            - 🌌 **Cosmic Breathing:** The stars and nebulas now pulse subtly on a 4-second sinusoidal rhythm to make the universe feel alive.
+            - 🛸 **Idle Hover:** The ship now bobs in a gentle Lissajous pattern when you aren't moving the joystick.
+            - ⏳ **Hit Stall (Time Dilation):** The game world slows down for exactly 2 frames when collecting stardust, giving physical weight to the action.
+            - ⚠️ **Directional Danger Indicators:** The edges of the screen glow red based on where asteroids are approaching from.
+            - 👻 **Ship Afterimages:** Moving the ship fast now leaves a trailing motion-blur effect.
+            - 📺 **Chromatic Aberration:** Dying now triggers an optimized RGB color-split glitch effect.
+            - 📊 **Elastic UI Animations:** Score popups now spring to life using mathematical Elastic Out easing functions.
+            - 🛑 **Pause Menu:** Added the ability to pause the game safely.
+            - 🇬🇧 **Full English Translation:** All UI texts and popups are now correctly displayed in English.
+
             ### 📱 Requirements
             - Android 5.0+ (API 21)
-            
+
             ### 📦 Install
             Download **StellarDrift-release.apk** and install.
           files: |
