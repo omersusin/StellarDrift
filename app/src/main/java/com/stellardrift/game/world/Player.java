@@ -14,9 +14,12 @@ public class Player {
     private float x, y, size, prevX;
     private float bankAngle, targetBank;
     private int screenW, screenH;
-    private float glowPulse, engineFlicker;
+    private float engineFlicker;
     private int comboTier, comboCount;
     private float comboProgress;
+
+    // Idle Hover
+    private float idleHoverTimer = 0f;
 
     private Path shipPath, wingL, wingR, flamePath, flameCore;
     private RectF cockpitRect, boundsRect, comboArcRect;
@@ -95,19 +98,28 @@ public class Player {
         return Constants.COMBO_TRAIL_COLORS[Math.min(comboTier, Constants.COMBO_TRAIL_COLORS.length - 1)];
     }
 
-    public void update(float dirX, float dirY, float magnitude) {
+    public void update(float dirX, float dirY, float magnitude, float dt) {
         prevX = x;
+        
         if (magnitude > Constants.JOY_DEAD_ZONE) {
             float adjMag = (magnitude - Constants.JOY_DEAD_ZONE) / (1f - Constants.JOY_DEAD_ZONE);
-            float speed = screenW * Constants.PLAYER_MOVE_SPEED * adjMag;
+            float speed = screenW * Constants.PLAYER_MOVE_SPEED * adjMag * (dt * 60f);
             x += dirX * speed; y += dirY * speed;
+        } else {
+            // Idle Hover: Eğer joystick hareket etmiyorsa yavaşça süzül (Lissajous eğrisi)
+            idleHoverTimer += dt;
+            float hoverX = (float) Math.sin(idleHoverTimer * 1.1f) * 1.5f;
+            float hoverY = (float) Math.sin(idleHoverTimer * 0.8f + 0.7f) * 2.0f;
+            x += hoverX * dt * 60f;
+            y += hoverY * dt * 60f;
         }
+
         x = Math.max(size, Math.min(screenW - size, x));
         y = Math.max(screenH * Constants.PLAYER_Y_MIN_RATIO, Math.min(screenH * Constants.PLAYER_Y_MAX_RATIO, y));
 
         float dx = x - prevX;
         targetBank = Math.max(-Constants.PLAYER_MAX_BANK_ANGLE, Math.min(Constants.PLAYER_MAX_BANK_ANGLE, dx * 2.5f));
-        bankAngle += (targetBank - bankAngle) * Constants.PLAYER_BANK_SPEED;
+        bankAngle += (targetBank - bankAngle) * Constants.PLAYER_BANK_SPEED * (dt * 60f);
 
         trailIdx = (trailIdx + 1) % TRAIL_LEN; trailX[trailIdx] = x; trailY[trailIdx] = y;
 
@@ -117,16 +129,18 @@ public class Player {
             afterIndex = (afterIndex + 1) % AFTERIMAGE_COUNT;
         }
 
-        glowPulse += 0.06f; engineFlicker = 0.7f + (float)(Math.random() * 0.3);
+        engineFlicker = 0.7f + (float)(Math.random() * 0.3);
+
         if (shielded) { shieldTimer--; shieldPulse += 0.15f; if (shieldTimer <= 0) shielded = false; }
         if (overdrive) { overdriveTimer--; overdrivePulse += 0.12f; if (overdriveTimer <= 0) overdrive = false; }
     }
 
-    public void render(Canvas c) {
-        renderTrail(c); renderGlow(c); drawAfterimages(c);
+    public void render(Canvas c, float cosmicBreath) {
+        renderTrail(c); renderGlow(c, cosmicBreath); drawAfterimages(c);
         c.save(); c.rotate(bankAngle, x, y);
         renderEngine(c, 255); buildShip(); renderShip(c, 255); renderDetails(c, 255);
         c.restore();
+
         if (comboCount > 1) drawComboArc(c);
         if (overdrive) renderOverdrive(c);
         if (shielded) renderShield(c);
@@ -175,8 +189,9 @@ public class Player {
         }
     }
 
-    private void renderGlow(Canvas c) {
-        float p = (float)(Math.sin(glowPulse) * 0.15 + 0.85);
+    private void renderGlow(Canvas c, float cosmicBreath) {
+        // Cosmic breath ile birleşen glow
+        float p = 0.85f + 0.15f * cosmicBreath;
         int gc = overdrive ? 0xFFFF6D00 : CYAN;
         glowPaint.setColor(gc);
         for (int i = 6; i >= 0; i--) {
@@ -251,7 +266,7 @@ public class Player {
     public RectF getBounds() { float s = size*0.4f; boundsRect.set(x-s, y-s*1.5f, x+s, y+s); return boundsRect; }
     public void reset() {
         x = screenW/2f; y = screenH * Constants.PLAYER_START_Y_RATIO; prevX = x;
-        bankAngle = 0; targetBank = 0; comboTier = 0; comboCount = 0;
+        bankAngle = 0; targetBank = 0; comboTier = 0; comboCount = 0; idleHoverTimer = 0f;
         shielded = false; shieldTimer = 0; overdrive = false; overdriveTimer = 0;
         for (int i = 0; i < TRAIL_LEN; i++) { trailX[i] = x; trailY[i] = y; }
         for (int i = 0; i < AFTERIMAGE_COUNT; i++) { afterX[i] = x; afterY[i] = y; afterAngle[i] = 0; }
