@@ -56,14 +56,19 @@ public class ProjectileSystem {
         projPaint.setStyle(Paint.Style.FILL); trailPaint.setStyle(Paint.Style.STROKE); trailPaint.setStrokeCap(Paint.Cap.ROUND); flashPaint.setStyle(Paint.Style.FILL);
     }
 
-    public float autoFire(float dt, float shipX, float shipY, float bankAngle, ShipData ship) {
+    // ── DEĞİŞİKLİK: fireRateMultiplier eklendi (Overcharge için) ──
+    public float autoFire(float dt, float shipX, float shipY, float bankAngle, ShipData ship, float fireRateMultiplier) {
         fireTimer += dt;
-        float fireInterval = 1f / ship.fireRate;
+        
+        float effectiveFireRate = ship.fireRate * fireRateMultiplier;
+        float fireInterval = 1f / effectiveFireRate;
         float recoilAmount = 0f;
 
         if (fireTimer >= fireInterval) {
             fireTimer -= fireInterval;
-            float baseSpeed = -800f * (screenHeight / 1920f) * ship.projectileSpeed; 
+            
+            float speedBoost = (fireRateMultiplier > 1.5f) ? 1.3f : 1.0f;
+            float baseSpeed = -800f * (screenHeight / 1920f) * ship.projectileSpeed * speedBoost; 
 
             float scale = (screenWidth / 1080f) * 2.5f;
 
@@ -75,6 +80,12 @@ public class ProjectileSystem {
                 float localY = ship.weaponY[w] * scale;
                 float worldX = shipX + localX * cos - localY * sin;
                 float worldY = shipY + localX * sin + localY * cos;
+                
+                // ── YENİ: Overcharge Spread Efekti ──
+                float spreadX = 0f;
+                if (fireRateMultiplier > 1.5f) {
+                    spreadX = (float)((Math.random() - 0.5) * 40);
+                }
 
                 float pw, ph;
                 switch (ship.id) {
@@ -88,9 +99,14 @@ public class ProjectileSystem {
                 }
 
                 Projectile p = pool[cursor]; cursor = (cursor + 1) % POOL_SIZE;
-                p.init(worldX, worldY, 0, baseSpeed, ship.damage, ship.projectileColor, pw, ph, ship.id);
+                p.init(worldX, worldY, spreadX, baseSpeed, ship.damage, ship.projectileColor, pw, ph, ship.id);
 
-                flashX[flashCursor] = worldX; flashY[flashCursor] = worldY; flashLife[flashCursor] = 1f; flashColor[flashCursor] = ship.projectileColor; flashCursor = (flashCursor + 1) % MAX_FLASHES;
+                flashX[flashCursor] = worldX; flashY[flashCursor] = worldY; flashLife[flashCursor] = 1f; 
+                
+                // ── YENİ: Overcharge Mavi Parlama ──
+                flashColor[flashCursor] = (fireRateMultiplier > 1.5f) ? Color.rgb(60, 180, 255) : ship.projectileColor; 
+                
+                flashCursor = (flashCursor + 1) % MAX_FLASHES;
             }
             recoilAmount = 1.0f; 
         }

@@ -10,6 +10,14 @@ import com.stellardrift.game.render.ShipRenderer;
 public class Player {
 
     private float x, y, prevX;
+    
+    // ── Velocity-Based Fizik (YENİ) ──
+    private float velX = 0f, velY = 0f;
+    private static final float ACCELERATION = 18f;
+    private static final float FRICTION = 12f;
+    private static final float VELOCITY_DEADZONE = 2f;
+    private static final float MIN_SPEED_FLOOR = 0.45f;
+
     private float bankAngle, targetBank;
     private int screenW, screenH;
     private float glowPulse;
@@ -38,6 +46,9 @@ public class Player {
     private boolean overdrive;
     private int overdriveTimer;
     private float overdrivePulse;
+
+    // Overcharge (Plasma Core)
+    private float overchargeSpeedBoost = 1.0f;
 
     private ShipData currentShip;
     private ShipRenderer renderer;
@@ -80,40 +91,82 @@ public class Player {
         else if (count >= 3) comboTier = 2; else if (count >= 1) comboTier = 1; else comboTier = 0;
     }
 
+    public void setOverchargeSpeedBoost(float boost) {
+        this.overchargeSpeedBoost = boost;
+    }
+
     private int getTrailColor() {
-        if (overdrive) return 0xFFFF6D00;
+        if (overdrive || overchargeSpeedBoost > 1.5f) return 0xFFFF6D00; // Turuncu
         return Constants.COMBO_TRAIL_COLORS[Math.min(comboTier, Constants.COMBO_TRAIL_COLORS.length - 1)];
     }
 
-    public void update(float dirX, float dirY, float magnitude, float dt) {
+    public void update(float joystickX, float joystickY, float magnitude, float dt) {
         prevX = x;
         
+        // ── 1. HEDEF HIZ HESAPLA ──
         float fuelSpeedMult = (fuelSystem != null) ? fuelSystem.getSpeedMultiplier() : 1.0f;
         float shipSpeedMult = (currentShip != null) ? currentShip.speedMultiplier : 1.0f;
         
-        // DÜZELTME: JUGGERNAUT BUG FIX - TABAN HIZ GARANTİSİ
-        // En düşük hız 0.45'ten aşağı düşemez. Gemi asla yerinde saymaz.
-        float rawEffectiveSpeed = Constants.PLAYER_MOVE_SPEED * shipSpeedMult * fuelSpeedMult;
-        float effectiveSpeed = Math.max(Constants.PLAYER_MOVE_SPEED * 0.45f, rawEffectiveSpeed);
-        
-        if (magnitude > Constants.JOY_DEAD_ZONE) {
+        float rawMaxSpeed = (screenW * Constants.PLAYER_MOVE_SPEED * 60f) * shipSpeedMult * fuelSpeedMult * overchargeSpeedBoost;
+        float maxSpeed = Math.max((screenW * Constants.PLAYER_MOVE_SPEED * 60f) * MIN_SPEED_FLOOR, rawMaxSpeed);
+
+        float targetVelX = 0;
+        float targetVelY = 0;
+
+        boolean joystickActive = magnitude > Constants.JOY_DEAD_ZONE;
+
+        if (joystickActive) {
             float adjMag = (magnitude - Constants.JOY_DEAD_ZONE) / (1f - Constants.JOY_DEAD_ZONE);
-            float speed = screenW * effectiveSpeed * adjMag * (dt * 60f);
-            x += dirX * speed; y += dirY * speed;
+            targetVelX = joystickX * maxSpeed * adjMag;
+            targetVelY = joystickY * maxSpeed * adjMag;
         } else {
+            // Idle Hover: Eğer joystick hareket etmiyorsa yavaşça süzül (Lissajous)
             idleHoverTimer += dt;
-            x += (float) Math.sin(idleHoverTimer * 1.1f) * 1.5f * dt * 60f * fuelSpeedMult;
-            y += (float) Math.sin(idleHoverTimer * 0.8f + 0.7f) * 2.0f * dt * 60f * fuelSpeedMult;
+            targetVelX = (float) Math.sin(idleHoverTimer * 1.1f) * 1.5f * 60f * fuelSpeedMult;
+            targetVelY = (float) Math.sin(idleHoverTimer * 0.8f + 0.7f) * 2.0f * 60f * fuelSpeedMult;
         }
 
-        float margin = getSize();
-        x = Math.max(margin, Math.min(screenW - margin, x));
-        y = Math.max(screenH * Constants.PLAYER_Y_MIN_RATIO, Math.min(screenH * Constants.PLAYER_Y_MAX_RATIO, y));
+        // ── 2. ACCELERATION / FRICTION UYGULA (Yağ gibi akma) ──
+        if (joystickActive) {
+            velX += (targetVelX - velX) * ACCELERATION * dt;
+            velY += (targetVelY - velY) * ACCELERATION * dt;
+        } else {
+            velX -= velX * FRICTION * dt;
+            velY -= velY * FRICTION * dt;
+            
+            // Hover hızını zorla uygula ki sıfırlanmasın
+            velX += (targetVelX - velX) * (ACCELERATION * 0.5f) * dt;
+            velY += (targetVelY - velY) * (ACCELERATION * 0.5f) * dt;
 
-        float dx = x - prevX;
-        targetBank = Math.max(-Constants.PLAYER_MAX_BANK_ANGLE, Math.min(Constants.PLAYER_MAX_BANK_ANGLE, dx * 2.5f));
+            if (Math.abs(velX) < VELOCITY_DEADZONE) velX = 0;
+            if (Math.abs(velY) < VELOCITY_DEADZONE) velY = 0;
+        }
+
+        // ── 3. HIZ LİMİTİ (Diagonal aşımı önle) ──
+        float currentVelMag = (float) Math.sqrt(velX * velX + velY * velY);
+        if (currentVelMag > maxSpeed && joystickActive) {
+            float scale = maxSpeed / currentVelMag;
+            velX *= scale;
+            velY *= scale;
+        }
+
+        // ── 4. POZİSYON GÜNCELLE ──
+        x += velX * dt;
+        y += velY * dt;
+
+        // ── 5. EKRAN SINIRLARI (Yumuşak sınırlama) ──
+        float margin = getSize();
+        if (x < margin) { x = margin; velX = Math.max(0, velX); }
+        if (x > screenW - margin) { x = screenW - margin; velX = Math.min(0, velX); }
+        if (y < screenH * Constants.PLAYER_Y_MIN_RATIO) { y = screenH * Constants.PLAYER_Y_MIN_RATIO; velY = Math.max(0, velY); }
+        if (y > screenH * Constants.PLAYER_Y_MAX_RATIO) { y = screenH * Constants.PLAYER_Y_MAX_RATIO; velY = Math.min(0, velY); }
+
+        // ── 6. BANKING (Eğilme - Artık velX'e bağlı, daha organik) ──
+        float normalizedVelX = velX / Math.max(maxSpeed, 1f);
+        targetBank = -normalizedVelX * Constants.PLAYER_MAX_BANK_ANGLE;
         bankAngle += (targetBank - bankAngle) * Constants.PLAYER_BANK_SPEED * (dt * 60f);
 
+        // Trail & Afterimage güncellemeleri
         trailIdx = (trailIdx + 1) % TRAIL_LEN; trailX[trailIdx] = x; trailY[trailIdx] = y;
 
         afterFrameSkip++;
@@ -129,7 +182,7 @@ public class Player {
 
     public void render(Canvas c, float cosmicBreath) {
         renderTrail(c); renderGlow(c, cosmicBreath); drawAfterimages(c);
-        renderer.drawShip(c, currentShip, x, y, bankAngle, 255, scaleMultiplier, overdrive);
+        renderer.drawShip(c, currentShip, x, y, bankAngle, 255, scaleMultiplier, overdrive || overchargeSpeedBoost > 1.5f);
         if (comboCount > 1) drawComboArc(c);
         if (overdrive) renderOverdrive(c, scaleMultiplier);
         if (shielded) renderShield(c, scaleMultiplier);
@@ -142,7 +195,7 @@ public class Player {
             int alpha = (int)(60 * (1f - age));
             if (alpha < 5) continue;
             float scale = (1f - age * 0.2f) * scaleMultiplier;
-            renderer.drawShip(c, currentShip, afterX[idx], afterY[idx], afterAngle[idx], alpha, scale, overdrive);
+            renderer.drawShip(c, currentShip, afterX[idx], afterY[idx], afterAngle[idx], alpha, scale, overdrive || overchargeSpeedBoost > 1.5f);
         }
     }
 
@@ -171,7 +224,7 @@ public class Player {
     private void renderGlow(Canvas c, float cosmicBreath) {
         float s = currentShip.collisionRadius * scaleMultiplier;
         float p = 0.85f + 0.15f * cosmicBreath;
-        glowPaint.setColor(overdrive ? 0xFFFF6D00 : currentShip.cockpitGlowColor);
+        glowPaint.setColor(overdrive || overchargeSpeedBoost > 1.5f ? 0xFFFF6D00 : currentShip.cockpitGlowColor);
         for (int i = 6; i >= 0; i--) {
             float f = (float) i / 6; glowPaint.setAlpha((int)((overdrive ? 15 : 10) * (1f - f)));
             c.drawCircle(x, y, s * (1.8f + f * 2.5f) * p, glowPaint);
@@ -198,8 +251,9 @@ public class Player {
     public RectF getBounds() { float s = getSize() * 0.8f; boundsRect.set(x-s, y-s*1.5f, x+s, y+s); return boundsRect; }
     public void reset() {
         x = screenW/2f; y = screenH * Constants.PLAYER_START_Y_RATIO; prevX = x;
+        velX = 0; velY = 0;
         bankAngle = 0; targetBank = 0; comboTier = 0; comboCount = 0; idleHoverTimer = 0f;
-        shielded = false; shieldTimer = 0; overdrive = false; overdriveTimer = 0;
+        shielded = false; shieldTimer = 0; overdrive = false; overdriveTimer = 0; overchargeSpeedBoost = 1.0f;
         for (int i = 0; i < TRAIL_LEN; i++) { trailX[i] = x; trailY[i] = y; }
         for (int i = 0; i < AFTERIMAGE_COUNT; i++) { afterX[i] = x; afterY[i] = y; afterAngle[i] = 0; }
     }

@@ -24,9 +24,8 @@ public class GameWorld {
     private ShipRegistry shipRegistry;
     private EconomyManager economy;
     private ProjectileSystem projectiles;
-    
-    // HATA ÇÖZÜMÜ: FuelSystem referansı tutulmalı
     private FuelSystem fuelSystem;
+    private PlasmaCore plasmaCore;
 
     private List<Asteroid> asteroids;
     private List<StarDust> starDusts;
@@ -57,8 +56,10 @@ public class GameWorld {
     private int lastMilestone;
     private String milestoneText;
     private int milestoneTimer;
+    
     private float dangerLevel;
     private float[] directionalDangers = new float[4]; 
+    
     private List<float[]> spawnWarnings;
     private List<float[]> nearMissFlashes;
 
@@ -72,8 +73,10 @@ public class GameWorld {
     private boolean firstStarDustSeen, firstNearMiss;
     private float transitionAlpha;
     private boolean transitioningIn;
+    
     private int soundToggleClicks = 0, vibToggleClicks = 0;
     private boolean isGodMode = false;
+
     private float cosmicBreathTimer = 0f, cosmicBreathValue = 0f, hitStallTimer = 0f, spawnBiasAngle = 0f;
 
     private static final int[] MILESTONES = {1000, 2500, 5000, 10000, 25000, 50000};
@@ -88,13 +91,9 @@ public class GameWorld {
 
         shipRegistry = new ShipRegistry();
         economy = new EconomyManager(ctx);
-        
-        // HATA ÇÖZÜMÜ: Player'ı çağırmadan önce FuelSystem'i oluştur
         fuelSystem = new FuelSystem(sw, sh);
-        
-        // HATA ÇÖZÜMÜ: Player artık 4 parametre alıyor
+        plasmaCore = new PlasmaCore(sw, sh);
         player = new Player(sw, sh, shipRegistry, fuelSystem);
-        
         projectiles = new ProjectileSystem(sw, sh);
 
         player.setShip(shipRegistry.getSelectedShip());
@@ -111,6 +110,7 @@ public class GameWorld {
 
     public void update(float joyDirX, float joyDirY, float joyMag) {
         float dt = 0.016f; 
+
         updateCosmicBreath(dt); updatePopups(dt); updateShake(); updateShockwave(); updateNearMissFlashes(); updateRingBursts(dt); updateTransition();
         
         if (state == Constants.STATE_PAUSED) return;
@@ -119,7 +119,7 @@ public class GameWorld {
 
         frameCount++;
         
-        // HATA ÇÖZÜMÜ: FuelSystem'i de update et
+        fuelSystem.setDrainPaused(isGodMode);
         fuelSystem.update(dt);
         
         hitStallTimer = Math.max(0, hitStallTimer - dt);
@@ -129,18 +129,23 @@ public class GameWorld {
         float gameSpeedMult = settings.getGameSpeedMultiplier();
         difficulty = Math.min(Constants.MAX_DIFFICULTY, 1f + frameCount * Constants.DIFFICULTY_RATE);
 
+        player.setOverchargeSpeedBoost(plasmaCore.getSpeedMultiplier());
         player.update(joyDirX, joyDirY, joyMag, dt);
         float comboProg = comboTimer > 0 ? (float)comboTimer / Constants.COMBO_TIMEOUT : 0f;
         player.setComboInfo(combo, comboProg);
         updateSpawnBias(dt, joyDirX, joyDirY, joyMag);
         
-        float recoil = projectiles.autoFire(dt, player.getX(), player.getY(), player.getBankAngle(), player.getShipData());
+        float overchargeFireMult = plasmaCore.getFireRateMultiplier();
+        float recoil = projectiles.autoFire(dt, player.getX(), player.getY(), player.getBankAngle(), player.getShipData(), overchargeFireMult);
         if (recoil > 0) { shakeIntensity = Math.max(shakeIntensity, recoil * 1.5f); }
+        
         projectiles.update(dt);
+        plasmaCore.update(dt);
 
         if (hitStallTimer <= 0) { updateTimers(); updateTempo(); handleSpawning(); updateSpawnWarnings(); }
 
         updateDirectionalDangers(dt);
+
         float effDiff = getEffectiveDifficulty(speedMult, gameSpeedMult) * effectiveDtScale;
         moveEntities(effDiff);
         applyStarDustMagnet();
@@ -199,12 +204,24 @@ public class GameWorld {
     private void handleSpawning() {
         boolean warmup = frameCount < Constants.WARMUP_FRAMES; int baseSpawn = settings.getSpawnInterval(); float tMult = getTempoSpawnMult();
         if (!warmup && !isGodMode) { int astInt = Math.max(5, (int)(baseSpawn / (difficulty * tMult))); if (frameCount % astInt == 0) { Asteroid a = new Asteroid(screenW, screenH, player.getX()); asteroids.add(a); spawnWarnings.add(new float[]{a.getX(), 20}); } }
+        
         float sdMult = getTempoStarDustMult(); if (isGodMode) sdMult = 5f; 
         int sdInt = Math.max(8, (int)(Constants.STARDUST_SPAWN_INTERVAL / (difficulty * sdMult)));
-        if (frameCount % sdInt == 0) { if (Math.random() < Constants.STARDUST_CHAIN_CHANCE && !chainActive) spawnStarDustChain(); else starDusts.add(spawnBiasedStarDust()); }
+        
+        if (frameCount % sdInt == 0) { 
+            if (Math.random() < 0.15f) {
+                plasmaCore.trySpawn((float)(Math.random() * screenW), -50, Constants.STARDUST_SPEED * (screenW / 1080f));
+            } else if (Math.random() < Constants.STARDUST_CHAIN_CHANCE && !chainActive) {
+                spawnStarDustChain(); 
+            } else {
+                starDusts.add(spawnBiasedStarDust()); 
+            }
+        }
+        
         powerUpSpawnTimer++; int pInterval = isGodMode ? Constants.POWERUP_SPAWN_INTERVAL / 2 : Constants.POWERUP_SPAWN_INTERVAL;
         if (powerUpSpawnTimer >= pInterval) { powerUpSpawnTimer = 0; int puType = isGodMode ? (Math.random() > 0.5 ? Constants.POWERUP_MAGNET : Constants.POWERUP_DOUBLE) : (int)(Math.random() * 4); powerUps.add(new PowerUp(screenW, screenH, puType)); }
     }
+    
     private StarDust spawnBiasedStarDust() {
         StarDust sd = new StarDust(screenW, screenH);
         if (Math.random() <= Constants.SPAWN_BIAS_STRENGTH) { float aheadDist = 150f + (float)(Math.random() * 150f); float angleOffset = (float)((Math.random() - 0.5) * Math.toRadians(60)); float finalAngle = spawnBiasAngle + angleOffset; float spawnX = player.getX() + (float) Math.cos(finalAngle) * aheadDist; spawnX = Math.max(20, Math.min(screenW - 20, spawnX)); sd.setPosition(spawnX, sd.getY()); }
@@ -229,21 +246,23 @@ public class GameWorld {
         Iterator<StarDust> si = starDusts.iterator(); while (si.hasNext()) { StarDust s = si.next(); if (RectF.intersects(pb, s.getBounds())) { if (!firstStarDustSeen) firstStarDustSeen = true; collectStarDust(s); si.remove(); } }
         Iterator<PowerUp> pui = powerUps.iterator(); while (pui.hasNext()) { PowerUp pu = pui.next(); if (RectF.intersects(pb, pu.getBounds())) { collectPowerUp(pu); pui.remove(); } }
 
+        if (plasmaCore.checkCollection(px, py, player.getCollisionRadius())) {
+            spawnCollectBurst(px, py, Color.rgb(60, 180, 255));
+            popups.add(new ScorePopup(px, py - 30, "⚡ OVERCHARGE!", Color.rgb(80, 200, 255), 1.5f));
+            shakeIntensity += 3f;
+            score += 50;
+            vibration.vibrateExplosion();
+        }
+
         projectiles.checkHits(asteroids, economy, new ProjectileSystem.HitCallback() {
             @Override
-            public void onAsteroidHit(Asteroid asteroid) {
-                spawnParticles(asteroid.getX(), asteroid.getY(), 3, Color.WHITE);
-                sound.playExplosion();
-            }
-
+            public void onAsteroidHit(Asteroid asteroid) { spawnParticles(asteroid.getX(), asteroid.getY(), 3, Color.WHITE); sound.playExplosion(); }
             @Override
             public void onAsteroidDestroyed(Asteroid asteroid) {
                 spawnParticles(asteroid.getX(), asteroid.getY(), 15, Color.rgb(200, 180, 100)); 
                 spawnRingBurst(asteroid.getX(), asteroid.getY(), Color.rgb(255, 215, 0)); 
                 popups.add(new ScorePopup(asteroid.getX(), asteroid.getY(), "+ " + asteroid.getCreditValue() + " CREDITS", Color.rgb(255, 215, 0), 1.2f));
-                sound.playExplosion();
-                vibration.vibrateExplosion();
-                score += 25; 
+                sound.playExplosion(); vibration.vibrateExplosion(); score += 25; 
             }
         });
 
@@ -263,8 +282,9 @@ public class GameWorld {
     }
 
     private void spawnRingBurst(float x, float y, int color) { int count = 7; float angleStep = (float)(2 * Math.PI / count); for (int i = 0; i < count; i++) { float angle = angleStep * i + (float)(Math.random() * 0.3); ringBursts.add(new float[]{x, y, (float)Math.cos(angle), (float)Math.sin(angle), 150 + (float)(Math.random() * 80), 1f, color}); } }
+    private void spawnCollectBurst(float x, float y, int color) { spawnRingBurst(x, y, color); }
     private void collectStarDust(StarDust s) { hitStallTimer = Constants.HIT_STALL_DURATION; combo++; comboTimer = Constants.COMBO_TIMEOUT; if (combo > maxCombo) maxCombo = combo; int pts = Constants.STARDUST_SCORE, cm = 1 + (int)(combo * Constants.COMBO_MULTIPLIER); if (doubleActive || isGodMode) cm *= 2; if (riskWindowActive) pts = (int)(pts * Constants.RISK_WINDOW_MULT); int fp = pts * cm; score += fp; orbsCollected++;
-        fuelSystem.onStarDustCollected(); // HATA ÇÖZÜMÜ: Yakıt eklendi
+        fuelSystem.onStarDustCollected(); 
         if (chainActive) { chainCounter++; if (chainCounter >= chainTarget) { chainActive = false; int chainBonus = Constants.STARDUST_CHAIN_BONUS * chainTarget; score += chainBonus; popups.add(new ScorePopup(s.getX(), s.getY() - 40, "CHAIN +" + chainBonus + "!", 0xFF00E5FF, 1.5f)); spawnParticles(s.getX(), s.getY(), 20, 0xFF00E5FF); fuelSystem.onChainCompleted(); } } popups.add(ScorePopup.createCollect(s.getX(), s.getY(), fp, cm)); spawnRingBurst(s.getX(), s.getY(), 0xFFFFD740); sound.playCollect(); vibration.vibrateCollect(); }
     private void collectPowerUp(PowerUp pu) { activatePowerUp(pu.getType()); popups.add(ScorePopup.createPowerUp(pu.getX(), pu.getY(), pu.getType())); spawnRingBurst(pu.getX(), pu.getY(), PowerUp.getColor(pu.getType())); sound.playCollect(); vibration.vibrateCollect(); }
     private void activatePowerUp(int type) { switch (type) { case Constants.POWERUP_MAGNET: magnetActive = true; magnetTimer = Constants.POWERUP_DURATION; break; case Constants.POWERUP_SLOWMO: slowmoActive = true; slowmoTimer = Constants.POWERUP_DURATION; break; case Constants.POWERUP_DOUBLE: doubleActive = true; doubleTimer = Constants.POWERUP_DURATION; break; case Constants.POWERUP_SHIELD: player.activateShield(Constants.POWERUP_DURATION); break; } }
@@ -286,8 +306,7 @@ public class GameWorld {
         powerUpSpawnTimer = 0; overdriveTriggered = false; riskWindowActive = false; riskWindowTimer = 0; freezeTimer = 0; killerAsteroid = null; shockwaveActive = false; shakeIntensity = 0; shakeX = 0; shakeY = 0;
         orbsCollected = 0; nearMissCount = 0; maxCombo = 0; lastMilestone = 0; milestoneText = null; milestoneTimer = 0; dangerLevel = 0; tempoPhase = Constants.TEMPO_CALM; tempoTimer = Constants.TEMPO_CALM_DURATION;
         chainActive = false; chainCounter = 0; chainTarget = 0; firstStarDustSeen = false; firstNearMiss = false; transitionAlpha = 1f; transitioningIn = true; grazeChainCount = 0; grazeChainTimer = 0; hitStallTimer = 0f; spawnBiasAngle = 0f;
-        fuelSystem.reset(); // YAKIT RESET
-        startTime = System.currentTimeMillis(); asteroids.clear(); starDusts.clear(); particles.clear(); powerUps.clear(); popups.clear(); spawnWarnings.clear(); nearMissFlashes.clear(); ringBursts.clear(); player.reset();
+        fuelSystem.reset(); startTime = System.currentTimeMillis(); asteroids.clear(); starDusts.clear(); particles.clear(); powerUps.clear(); popups.clear(); spawnWarnings.clear(); nearMissFlashes.clear(); ringBursts.clear(); plasmaCore.reset(); player.reset();
         player.setShip(shipRegistry.getSelectedShip()); 
         if (isGodMode) popups.add(new ScorePopup(screenW/2f, screenH/2f, "GOD MODE ENABLED", 0xFFFFD740, 2f));
     }
@@ -303,8 +322,5 @@ public class GameWorld {
 
     public int getState() { return state; } public int getScore() { return score; } public int getHighScore() { return settings.getHighScore(); } public float getDifficulty() { return difficulty; } public Player getPlayer() { return player; } public List<Asteroid> getAsteroids() { return asteroids; } public List<StarDust> getStarDusts() { return starDusts; } public List<Particle> getParticles() { return particles; } public List<PowerUp> getPowerUps() { return powerUps; } public List<ScorePopup> getPopups() { return popups; } public SettingsManager getSettings() { return settings; } public int getCombo() { return combo; } public boolean isMagnetActive() { return magnetActive; } public boolean isSlowmoActive() { return slowmoActive; } public boolean isDoubleActive() { return doubleActive; } public int getMagnetTimer() { return magnetTimer; } public int getSlowmoTimer() { return slowmoTimer; } public int getDoubleTimer() { return doubleTimer; } public float getShakeX() { return shakeX; } public float getShakeY() { return shakeY; } public int getOrbsCollected() { return orbsCollected; } public int getNearMissCount() { return nearMissCount; } public int getMaxCombo() { return maxCombo; } public long getSurvivalTime() { return startTime == 0 ? 0 : (System.currentTimeMillis() - startTime) / 1000; } public int getTempoPhase() { return tempoPhase; } public boolean isRiskWindowActive() { return riskWindowActive; } public int getRiskWindowTimer() { return riskWindowTimer; } public boolean isFreezing() { return freezeTimer > 0; } public Asteroid getKillerAsteroid() { return killerAsteroid; } public boolean isShockwaveActive() { return shockwaveActive; } public float getShockwaveX() { return shockwaveX; } public float getShockwaveY() { return shockwaveY; } public float getShockwaveRadius() { return shockwaveRadius; } public float getShockwaveAlpha() { return shockwaveAlpha; } public float getDangerLevel() { return dangerLevel; } public float[] getDirectionalDangers() { return directionalDangers; } public String getMilestoneText() { return milestoneText; } public int getMilestoneTimer() { return milestoneTimer; } public List<float[]> getSpawnWarnings() { return spawnWarnings; } public List<float[]> getNearMissFlashes() { return nearMissFlashes; } public List<float[]> getRingBursts() { return ringBursts; } public float getTransitionAlpha() { return transitionAlpha; } public boolean isFirstStarDustSeen() { return firstStarDustSeen; } public boolean isFirstNearMiss() { return firstNearMiss; } public int getFrameCount() { return frameCount; } public float getCosmicBreath() { return cosmicBreathValue; } public void releaseResources() { if (sound != null) sound.release(); }
     public ProjectileSystem getProjectiles() { return projectiles; } public ShipRegistry getShipRegistry() { return shipRegistry; } public EconomyManager getEconomy() { return economy; } 
-    
-    // EKSIK OLAN 2 GETTER BURADA:
-    public FuelSystem getFuelSystem() { return fuelSystem; }
-    public boolean isGodModeActive() { return isGodMode; }
+    public FuelSystem getFuelSystem() { return fuelSystem; } public boolean isGodModeActive() { return isGodMode; } public PlasmaCore getPlasmaCore() { return plasmaCore; }
 }

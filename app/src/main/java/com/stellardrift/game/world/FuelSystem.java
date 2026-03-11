@@ -8,13 +8,13 @@ import android.graphics.RectF;
 public class FuelSystem {
 
     private static final float MAX_FUEL = 100f;
-    private static final float FUEL_DRAIN_PER_SECOND = 3.5f;   // Saniyede azalan miktar
-    private static final float FUEL_PER_STARDUST = 8f;          // 1 StarDust = 8 yakıt
-    private static final float FUEL_BONUS_CHAIN = 3f;           // Zincir bitince ek bonus
+    private static final float FUEL_DRAIN_PER_SECOND = 3.5f;   
+    private static final float FUEL_PER_STARDUST = 8f;          
+    private static final float FUEL_BONUS_CHAIN = 3f;           
 
-    private static final float SPEED_AT_FULL = 1.3f;            // Full yakıt = %130 hız
-    private static final float SPEED_AT_EMPTY = 0.35f;          // Sıfır yakıt = %35 hız
-    private static final float SPEED_CRITICAL_BOOST = 0.05f;    // Kritik seviyede titreme
+    private static final float SPEED_AT_FULL = 1.3f;            
+    private static final float SPEED_AT_EMPTY = 0.35f;          
+    private static final float SPEED_CRITICAL_BOOST = 0.05f;    
 
     private float currentFuel;
     private float displayedFuel;        
@@ -24,6 +24,8 @@ public class FuelSystem {
     private float barFlashTimer = 0f;   
     private float warningPulse = 0f;    
     private boolean isCritical = false; 
+    
+    private boolean drainPaused = false; // God Mode için eklendi
 
     private final Paint barBgPaint = new Paint();
     private final Paint barFillPaint = new Paint();
@@ -46,7 +48,6 @@ public class FuelSystem {
         this.displayedFuel = MAX_FUEL;
         this.speedMultiplier = SPEED_AT_FULL;
 
-        // Bar ekranın solunda yer alır
         barWidth = screenWidth * 0.015f;
         barHeight = screenHeight * 0.3f;
         barX = screenWidth * 0.025f;
@@ -69,10 +70,18 @@ public class FuelSystem {
 
         warningPaint.setStyle(Paint.Style.FILL);
     }
+    
+    public void setDrainPaused(boolean paused) {
+        this.drainPaused = paused;
+    }
 
     public void update(float dt) {
-        currentFuel -= FUEL_DRAIN_PER_SECOND * dt;
-        currentFuel = Math.max(0f, currentFuel);
+        if (!drainPaused) {
+            currentFuel -= FUEL_DRAIN_PER_SECOND * dt;
+            currentFuel = Math.max(0f, currentFuel);
+        } else {
+            currentFuel = MAX_FUEL;
+        }
 
         float diff = currentFuel - displayedFuel;
         float step = Math.abs(diff) * 5f * dt;
@@ -89,7 +98,7 @@ public class FuelSystem {
 
         isCritical = (fuelRatio < 0.20f);
 
-        if (isCritical) {
+        if (isCritical && !drainPaused) {
             pulseTimer += dt;
             float pulse = (float) Math.sin(pulseTimer * 8.0) * SPEED_CRITICAL_BOOST;
             speedMultiplier += pulse;
@@ -121,6 +130,7 @@ public class FuelSystem {
         barFlashTimer = 0f;
         pulseTimer = 0f;
         isCritical = false;
+        drainPaused = false;
     }
 
     public void draw(Canvas canvas) {
@@ -179,7 +189,7 @@ public class FuelSystem {
         labelPaint.setTextSize(screenWidth * 0.025f);
         canvas.drawText(percent + "%", barX + barWidth / 2, barY - 10, labelPaint);
 
-        if (isCritical) drawCriticalWarning(canvas);
+        if (isCritical && !drainPaused) drawCriticalWarning(canvas);
     }
 
     private void drawCriticalWarning(Canvas canvas) {
