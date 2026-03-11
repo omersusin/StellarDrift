@@ -32,10 +32,14 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback {
     private RadialGradient vignetteNormal, vignetteDanger;
     private float currentDanger;
 
+    // Pause UI
     private Paint pauseDimPaint, pauseTitlePaint, pauseBtnPaint, pauseBtnOutPaint, pauseBtnTextPaint;
     private RectF pauseResumeBtn, pauseQuitBtn, pauseBtn;
 
+    // Transition
     private Paint transitionPaint;
+
+    // Tutorial
     private Paint tutorialPaint, tutorialBgPaint;
 
     public GameView(Context context) {
@@ -43,8 +47,12 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback {
         getHolder().addCallback(this);
         setFocusable(true);
         vignettePaint = new Paint();
-        riskBorderPaint = new Paint(Paint.ANTI_ALIAS_FLAG); riskBorderPaint.setStyle(Paint.Style.STROKE); riskBorderPaint.setColor(0xFFFFD740);
-        transitionPaint = new Paint(); transitionPaint.setColor(Color.BLACK);
+        riskBorderPaint = new Paint(Paint.ANTI_ALIAS_FLAG); 
+        riskBorderPaint.setStyle(Paint.Style.STROKE); 
+        riskBorderPaint.setColor(0xFFFFD740);
+        
+        transitionPaint = new Paint(); 
+        transitionPaint.setColor(Color.BLACK);
 
         pauseDimPaint = new Paint(); pauseDimPaint.setColor(0xCC050510);
         pauseTitlePaint = new Paint(Paint.ANTI_ALIAS_FLAG); pauseTitlePaint.setColor(0xFF00E5FF); pauseTitlePaint.setTextAlign(Paint.Align.CENTER); pauseTitlePaint.setTypeface(Typeface.DEFAULT_BOLD);
@@ -105,8 +113,11 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback {
         switch (event.getAction()) {
             case MotionEvent.ACTION_DOWN:
                 if (state == Constants.STATE_PLAYING) {
-                    if (pauseBtn.contains(ex, ey)) { gameWorld.pauseGame(); }
-                    else { joystick.onTouchDown(ex, ey); }
+                    if (pauseBtn != null && pauseBtn.contains(ex, ey)) { 
+                        gameWorld.pauseGame(); 
+                    } else { 
+                        joystick.onTouchDown(ex, ey); 
+                    }
                 } else if (state == Constants.STATE_PAUSED) {
                     handlePauseTap(ex, ey);
                 } else {
@@ -122,6 +133,16 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback {
                 break;
         }
         return true;
+    }
+
+    // EKSIK OLAN METOD BURADA
+    private void handlePauseTap(float x, float y) {
+        if (gameWorld == null) return;
+        if (pauseResumeBtn != null && pauseResumeBtn.contains(x, y)) {
+            gameWorld.resumeGame();
+        } else if (pauseQuitBtn != null && pauseQuitBtn.contains(x, y)) {
+            gameWorld.quitToMenu();
+        }
     }
 
     private void handleTap(float x, float y) {
@@ -143,7 +164,6 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback {
     }
 
     public void updateGame() {
-        // DÜZELTME: dt (0.016f) parametresini de ekledik
         if (background != null && gameWorld != null) {
             background.update(gameWorld.getDifficulty(), gameWorld.getTempoPhase(), 0.016f);
         }
@@ -159,8 +179,10 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback {
         float sx = 0, sy = 0;
         if (gameWorld != null) { sx = gameWorld.getShakeX(); sy = gameWorld.getShakeY(); }
         if (sx != 0 || sy != 0) canvas.translate(sx, sy);
+        
         if (background != null) background.render(canvas);
         if (renderer != null && gameWorld != null) renderer.render(canvas, gameWorld);
+        
         if (sx != 0 || sy != 0) canvas.translate(-sx, -sy);
 
         drawVignette(canvas);
@@ -169,14 +191,18 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback {
         int state = gameWorld != null ? gameWorld.getState() : Constants.STATE_MENU;
 
         if (state == Constants.STATE_PLAYING) {
-            joystick.render(canvas);
+            if (joystick != null) joystick.render(canvas);
             drawPauseButton(canvas);
             drawTutorial(canvas);
         }
 
-        if (state == Constants.STATE_PAUSED) drawPauseScreen(canvas);
+        if (state == Constants.STATE_PAUSED) {
+            drawPauseScreen(canvas);
+        }
 
-        if (uiOverlay != null && gameWorld != null) uiOverlay.renderFull(canvas, gameWorld);
+        if (uiOverlay != null && gameWorld != null) {
+            uiOverlay.renderFull(canvas, gameWorld);
+        }
 
         drawTransition(canvas);
     }
@@ -200,8 +226,10 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback {
         float blink = progress < 0.25f ? (float)(Math.sin(timer * 0.5) * 0.4 + 0.6) : 1f;
         int alpha = (int)(120 * progress * blink);
         riskBorderPaint.setAlpha(alpha); riskBorderPaint.setStrokeWidth(3f);
-        canvas.drawLine(0, 0, screenW, 0, riskBorderPaint); canvas.drawLine(0, screenH, screenW, screenH, riskBorderPaint);
-        canvas.drawLine(0, 0, 0, screenH, riskBorderPaint); canvas.drawLine(screenW, 0, screenW, screenH, riskBorderPaint);
+        canvas.drawLine(0, 0, screenW, 0, riskBorderPaint); 
+        canvas.drawLine(0, screenH, screenW, screenH, riskBorderPaint);
+        canvas.drawLine(0, 0, 0, screenH, riskBorderPaint); 
+        canvas.drawLine(screenW, 0, screenW, screenH, riskBorderPaint);
     }
 
     private void drawPauseButton(Canvas canvas) {
