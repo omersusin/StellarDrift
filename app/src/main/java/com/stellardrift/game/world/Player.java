@@ -15,6 +15,7 @@ public class Player {
     private float bankAngle, targetBank;
     private int screenW, screenH;
     private float glowPulse, engineFlicker;
+    private int comboTier;
 
     private Path shipPath, wingL, wingR, flamePath, flameCore;
     private RectF cockpitRect, boundsRect;
@@ -30,7 +31,6 @@ public class Player {
     private boolean shielded;
     private int shieldTimer;
     private float shieldPulse;
-
     private boolean overdrive;
     private int overdriveTimer;
     private float overdrivePulse;
@@ -44,13 +44,10 @@ public class Player {
     public Player(int sw, int sh) {
         screenW = sw; screenH = sh;
         size = sw * Constants.PLAYER_SIZE_RATIO;
-        x = sw / 2f;
-        y = sh * Constants.PLAYER_START_Y_RATIO;
-        prevX = x;
-        bankAngle = 0; targetBank = 0;
+        x = sw / 2f; y = sh * Constants.PLAYER_START_Y_RATIO;
+        prevX = x; bankAngle = 0; targetBank = 0; comboTier = 0;
 
-        trailX = new float[TRAIL_LEN];
-        trailY = new float[TRAIL_LEN];
+        trailX = new float[TRAIL_LEN]; trailY = new float[TRAIL_LEN];
         for (int i = 0; i < TRAIL_LEN; i++) { trailX[i] = x; trailY[i] = y; }
         trailIdx = 0;
 
@@ -61,108 +58,93 @@ public class Player {
     }
 
     private void initPaints() {
-        shipPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-        shipPaint.setStyle(Paint.Style.FILL);
-        outlinePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-        outlinePaint.setColor(CYAN); outlinePaint.setStyle(Paint.Style.STROKE);
-        outlinePaint.setStrokeWidth(1.5f); outlinePaint.setAlpha(180);
-        glowPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-        glowPaint.setColor(CYAN); glowPaint.setStyle(Paint.Style.FILL);
-        enginePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-        enginePaint.setStyle(Paint.Style.FILL);
-        engineCorePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-        engineCorePaint.setColor(YELLOW); engineCorePaint.setStyle(Paint.Style.FILL);
-        trailPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-        trailPaint.setColor(CYAN); trailPaint.setStyle(Paint.Style.FILL);
-        cockpitPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-        cockpitPaint.setColor(Color.WHITE); cockpitPaint.setStyle(Paint.Style.FILL);
-        wingPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-        wingPaint.setColor(PURPLE); wingPaint.setStyle(Paint.Style.FILL);
-        wingPaint.setAlpha(140);
-        stripePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-        stripePaint.setColor(CYAN); stripePaint.setStrokeCap(Paint.Cap.ROUND);
-        stripePaint.setStyle(Paint.Style.STROKE);
-        shieldPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-        shieldPaint.setColor(CYAN); shieldPaint.setStyle(Paint.Style.STROKE);
-        shieldPaint.setStrokeWidth(2.5f);
+        shipPaint = new Paint(Paint.ANTI_ALIAS_FLAG); shipPaint.setStyle(Paint.Style.FILL);
+        outlinePaint = new Paint(Paint.ANTI_ALIAS_FLAG); outlinePaint.setColor(CYAN);
+        outlinePaint.setStyle(Paint.Style.STROKE); outlinePaint.setStrokeWidth(1.5f); outlinePaint.setAlpha(180);
+        glowPaint = new Paint(Paint.ANTI_ALIAS_FLAG); glowPaint.setColor(CYAN); glowPaint.setStyle(Paint.Style.FILL);
+        enginePaint = new Paint(Paint.ANTI_ALIAS_FLAG); enginePaint.setStyle(Paint.Style.FILL);
+        engineCorePaint = new Paint(Paint.ANTI_ALIAS_FLAG); engineCorePaint.setColor(YELLOW); engineCorePaint.setStyle(Paint.Style.FILL);
+        trailPaint = new Paint(Paint.ANTI_ALIAS_FLAG); trailPaint.setColor(CYAN); trailPaint.setStyle(Paint.Style.FILL);
+        cockpitPaint = new Paint(Paint.ANTI_ALIAS_FLAG); cockpitPaint.setColor(Color.WHITE); cockpitPaint.setStyle(Paint.Style.FILL);
+        wingPaint = new Paint(Paint.ANTI_ALIAS_FLAG); wingPaint.setColor(PURPLE); wingPaint.setStyle(Paint.Style.FILL); wingPaint.setAlpha(140);
+        stripePaint = new Paint(Paint.ANTI_ALIAS_FLAG); stripePaint.setColor(CYAN); stripePaint.setStrokeCap(Paint.Cap.ROUND); stripePaint.setStyle(Paint.Style.STROKE);
+        shieldPaint = new Paint(Paint.ANTI_ALIAS_FLAG); shieldPaint.setColor(CYAN); shieldPaint.setStyle(Paint.Style.STROKE); shieldPaint.setStrokeWidth(2.5f);
+    }
+
+    public void setComboTier(int combo) {
+        if (combo >= 10) comboTier = 4;
+        else if (combo >= 6) comboTier = 3;
+        else if (combo >= 3) comboTier = 2;
+        else if (combo >= 1) comboTier = 1;
+        else comboTier = 0;
+    }
+
+    private int getTrailColor() {
+        if (overdrive) return 0xFFFF6D00;
+        return Constants.COMBO_TRAIL_COLORS[Math.min(comboTier, Constants.COMBO_TRAIL_COLORS.length - 1)];
+    }
+
+    private float getTrailSize() {
+        float base = size * 0.2f;
+        float comboBonus = comboTier * size * 0.03f;
+        float overdriveBonus = overdrive ? size * 0.1f : 0;
+        return base + comboBonus + overdriveBonus;
+    }
+
+    private int getTrailAlpha() {
+        if (overdrive) return 55;
+        return 25 + comboTier * 6;
     }
 
     public void update(float dirX, float dirY, float magnitude) {
         prevX = x;
-
-        // Joystick movement — tüm yönlere
         if (magnitude > Constants.JOY_DEAD_ZONE) {
-            float adjMag = (magnitude - Constants.JOY_DEAD_ZONE)
-                         / (1f - Constants.JOY_DEAD_ZONE);
+            float adjMag = (magnitude - Constants.JOY_DEAD_ZONE) / (1f - Constants.JOY_DEAD_ZONE);
             float speed = screenW * Constants.PLAYER_MOVE_SPEED * adjMag;
-            x += dirX * speed;
-            y += dirY * speed;
+            x += dirX * speed; y += dirY * speed;
         }
-
-        // Sınırları koru
         x = Math.max(size, Math.min(screenW - size, x));
-        y = Math.max(screenH * Constants.PLAYER_Y_MIN_RATIO,
-                     Math.min(screenH * Constants.PLAYER_Y_MAX_RATIO, y));
+        y = Math.max(screenH * Constants.PLAYER_Y_MIN_RATIO, Math.min(screenH * Constants.PLAYER_Y_MAX_RATIO, y));
 
-        // Banking
         float dx = x - prevX;
-        targetBank = Math.max(-Constants.PLAYER_MAX_BANK_ANGLE,
-            Math.min(Constants.PLAYER_MAX_BANK_ANGLE, dx * 2.5f));
+        targetBank = Math.max(-Constants.PLAYER_MAX_BANK_ANGLE, Math.min(Constants.PLAYER_MAX_BANK_ANGLE, dx * 2.5f));
         bankAngle += (targetBank - bankAngle) * Constants.PLAYER_BANK_SPEED;
 
-        // Trail
         trailIdx = (trailIdx + 1) % TRAIL_LEN;
         trailX[trailIdx] = x; trailY[trailIdx] = y;
-
         glowPulse += 0.06f;
         engineFlicker = 0.7f + (float)(Math.random() * 0.3);
 
-        if (shielded) {
-            shieldTimer--; shieldPulse += 0.15f;
-            if (shieldTimer <= 0) shielded = false;
-        }
-        if (overdrive) {
-            overdriveTimer--; overdrivePulse += 0.12f;
-            if (overdriveTimer <= 0) overdrive = false;
-        }
+        if (shielded) { shieldTimer--; shieldPulse += 0.15f; if (shieldTimer <= 0) shielded = false; }
+        if (overdrive) { overdriveTimer--; overdrivePulse += 0.12f; if (overdriveTimer <= 0) overdrive = false; }
     }
 
     public void render(Canvas c) {
-        renderTrail(c);
-        renderGlow(c);
-
-        c.save();
-        c.rotate(bankAngle, x, y);
-        renderEngine(c);
-        buildShip();
-        renderShip(c);
-        renderDetails(c);
+        renderTrail(c); renderGlow(c);
+        c.save(); c.rotate(bankAngle, x, y);
+        renderEngine(c); buildShip(); renderShip(c); renderDetails(c);
         c.restore();
-
         if (overdrive) renderOverdrive(c);
         if (shielded) renderShield(c);
     }
 
     private void renderTrail(Canvas c) {
+        int trailColor = getTrailColor();
+        float trailSize = getTrailSize();
+        int trailAlpha = getTrailAlpha();
         for (int i = 0; i < TRAIL_LEN; i++) {
             int idx = (trailIdx - i + TRAIL_LEN) % TRAIL_LEN;
             float a = 1f - (i / (float) TRAIL_LEN);
-            if (overdrive) {
-                trailPaint.setColor(0xFFFF6D00);
-                trailPaint.setAlpha((int)(55 * a));
-                c.drawCircle(trailX[idx], trailY[idx] + size * 0.5f, size * 0.3f * a, trailPaint);
-                trailPaint.setColor(CYAN);
-            } else {
-                trailPaint.setAlpha((int)(35 * a));
-                c.drawCircle(trailX[idx], trailY[idx] + size * 0.5f, size * 0.2f * a, trailPaint);
-            }
+            trailPaint.setColor(trailColor);
+            trailPaint.setAlpha((int)(trailAlpha * a));
+            c.drawCircle(trailX[idx], trailY[idx] + size * 0.5f, trailSize * a, trailPaint);
         }
     }
 
     private void renderGlow(Canvas c) {
         float p = (float)(Math.sin(glowPulse) * 0.15 + 0.85);
-        int glowColor = overdrive ? 0xFFFF6D00 : CYAN;
-        glowPaint.setColor(glowColor);
+        int gc = overdrive ? 0xFFFF6D00 : CYAN;
+        glowPaint.setColor(gc);
         for (int i = 6; i >= 0; i--) {
             float f = (float) i / 6;
             glowPaint.setAlpha((int)((overdrive ? 15 : 10) * (1f - f)));
@@ -179,115 +161,64 @@ public class Player {
     }
 
     private void drawFlame(Canvas c, float fx, float fy, float w, float l) {
-        flamePath.reset();
-        flamePath.moveTo(fx - w, fy); flamePath.lineTo(fx, fy + l);
-        flamePath.lineTo(fx + w, fy); flamePath.close();
-        enginePaint.setColor(ORANGE); enginePaint.setAlpha((int)(200 * engineFlicker));
-        c.drawPath(flamePath, enginePaint);
-        flameCore.reset();
-        flameCore.moveTo(fx - w*0.45f, fy); flameCore.lineTo(fx, fy + l*0.55f);
-        flameCore.lineTo(fx + w*0.45f, fy); flameCore.close();
-        engineCorePaint.setAlpha((int)(240 * engineFlicker));
-        c.drawPath(flameCore, engineCorePaint);
+        flamePath.reset(); flamePath.moveTo(fx-w, fy); flamePath.lineTo(fx, fy+l); flamePath.lineTo(fx+w, fy); flamePath.close();
+        enginePaint.setColor(ORANGE); enginePaint.setAlpha((int)(200 * engineFlicker)); c.drawPath(flamePath, enginePaint);
+        flameCore.reset(); flameCore.moveTo(fx-w*0.45f, fy); flameCore.lineTo(fx, fy+l*0.55f); flameCore.lineTo(fx+w*0.45f, fy); flameCore.close();
+        engineCorePaint.setAlpha((int)(240 * engineFlicker)); c.drawPath(flameCore, engineCorePaint);
     }
 
     private void buildShip() {
         shipPath.reset(); float s = size;
-        shipPath.moveTo(x, y - s*1.3f);
-        shipPath.lineTo(x + s*0.15f, y - s*0.65f);
-        shipPath.lineTo(x + s*0.35f, y - s*0.25f);
-        shipPath.lineTo(x + s*0.85f, y + s*0.45f);
-        shipPath.lineTo(x + s*0.45f, y + s*0.28f);
-        shipPath.lineTo(x + s*0.25f, y + s*0.42f);
-        shipPath.lineTo(x, y + s*0.35f);
-        shipPath.lineTo(x - s*0.25f, y + s*0.42f);
-        shipPath.lineTo(x - s*0.45f, y + s*0.28f);
-        shipPath.lineTo(x - s*0.85f, y + s*0.45f);
-        shipPath.lineTo(x - s*0.35f, y - s*0.25f);
-        shipPath.lineTo(x - s*0.15f, y - s*0.65f);
+        shipPath.moveTo(x, y-s*1.3f); shipPath.lineTo(x+s*0.15f, y-s*0.65f);
+        shipPath.lineTo(x+s*0.35f, y-s*0.25f); shipPath.lineTo(x+s*0.85f, y+s*0.45f);
+        shipPath.lineTo(x+s*0.45f, y+s*0.28f); shipPath.lineTo(x+s*0.25f, y+s*0.42f);
+        shipPath.lineTo(x, y+s*0.35f); shipPath.lineTo(x-s*0.25f, y+s*0.42f);
+        shipPath.lineTo(x-s*0.45f, y+s*0.28f); shipPath.lineTo(x-s*0.85f, y+s*0.45f);
+        shipPath.lineTo(x-s*0.35f, y-s*0.25f); shipPath.lineTo(x-s*0.15f, y-s*0.65f);
         shipPath.close();
     }
 
     private void renderShip(Canvas c) {
-        int topCol = overdrive ? 0xFF4A148C : DEEP_BLUE;
-        int botCol = overdrive ? 0xFFFF6D00 : PURPLE;
-        shipPaint.setShader(new LinearGradient(
-            x, y - size*1.3f, x, y + size*0.5f,
-            topCol, botCol, Shader.TileMode.CLAMP));
-        c.drawPath(shipPath, shipPaint);
-        shipPaint.setShader(null);
-        int outCol = overdrive ? 0xFFFF6D00 : CYAN;
-        outlinePaint.setColor(outCol); outlinePaint.setAlpha(180);
+        int tc = overdrive ? 0xFF4A148C : DEEP_BLUE; int bc = overdrive ? 0xFFFF6D00 : PURPLE;
+        shipPaint.setShader(new LinearGradient(x, y-size*1.3f, x, y+size*0.5f, tc, bc, Shader.TileMode.CLAMP));
+        c.drawPath(shipPath, shipPaint); shipPaint.setShader(null);
+        int oc = overdrive ? 0xFFFF6D00 : CYAN; outlinePaint.setColor(oc); outlinePaint.setAlpha(180);
         c.drawPath(shipPath, outlinePaint);
     }
 
     private void renderDetails(Canvas c) {
         float s = size;
-        stripePaint.setAlpha(120); stripePaint.setStrokeWidth(s * 0.05f);
-        c.drawLine(x, y - s*0.9f, x, y + s*0.15f, stripePaint);
-        cockpitPaint.setAlpha(210);
-        cockpitRect.set(x - s*0.07f, y - s*0.75f, x + s*0.07f, y - s*0.3f);
+        stripePaint.setAlpha(120); stripePaint.setStrokeWidth(s*0.05f);
+        c.drawLine(x, y-s*0.9f, x, y+s*0.15f, stripePaint);
+        cockpitPaint.setAlpha(210); cockpitRect.set(x-s*0.07f, y-s*0.75f, x+s*0.07f, y-s*0.3f);
         c.drawOval(cockpitRect, cockpitPaint);
-        wingL.reset();
-        wingL.moveTo(x - s*0.32f, y - s*0.05f);
-        wingL.lineTo(x - s*0.7f, y + s*0.35f);
-        wingL.lineTo(x - s*0.38f, y + s*0.18f); wingL.close();
+        wingL.reset(); wingL.moveTo(x-s*0.32f, y-s*0.05f); wingL.lineTo(x-s*0.7f, y+s*0.35f); wingL.lineTo(x-s*0.38f, y+s*0.18f); wingL.close();
         c.drawPath(wingL, wingPaint);
-        wingR.reset();
-        wingR.moveTo(x + s*0.32f, y - s*0.05f);
-        wingR.lineTo(x + s*0.7f, y + s*0.35f);
-        wingR.lineTo(x + s*0.38f, y + s*0.18f); wingR.close();
+        wingR.reset(); wingR.moveTo(x+s*0.32f, y-s*0.05f); wingR.lineTo(x+s*0.7f, y+s*0.35f); wingR.lineTo(x+s*0.38f, y+s*0.18f); wingR.close();
         c.drawPath(wingR, wingPaint);
     }
 
     private void renderOverdrive(Canvas c) {
-        float p = (float)(Math.sin(overdrivePulse) * 0.15 + 0.85);
-        float r = size * 1.6f * p;
-        for (int i = 3; i >= 0; i--) {
-            glowPaint.setColor(0xFFFF6D00);
-            glowPaint.setAlpha(30 - i * 7);
-            c.drawCircle(x, y, r + i * 4, glowPaint);
-        }
+        float p = (float)(Math.sin(overdrivePulse) * 0.15 + 0.85); float r = size * 1.6f * p;
+        for (int i = 3; i >= 0; i--) { glowPaint.setColor(0xFFFF6D00); glowPaint.setAlpha(30-i*7); c.drawCircle(x, y, r+i*4, glowPaint); }
         glowPaint.setColor(CYAN);
     }
 
     private void renderShield(Canvas c) {
-        float p = (float)(Math.sin(shieldPulse) * 0.1 + 0.9);
-        float r = size * 1.5f * p;
-        for (int i = 3; i >= 0; i--) {
-            shieldPaint.setAlpha(70 - i * 16);
-            c.drawCircle(x, y, r + i * 3, shieldPaint);
-        }
+        float p = (float)(Math.sin(shieldPulse) * 0.1 + 0.9); float r = size * 1.5f * p;
+        for (int i = 3; i >= 0; i--) { shieldPaint.setAlpha(70-i*16); c.drawCircle(x, y, r+i*3, shieldPaint); }
     }
 
-    public float getX() { return x; }
-    public float getY() { return y; }
-    public float getSize() { return size; }
-    public boolean isShielded() { return shielded; }
+    public float getX() { return x; } public float getY() { return y; }
+    public float getSize() { return size; } public boolean isShielded() { return shielded; }
     public boolean isOverdrive() { return overdrive; }
-
-    public void activateShield(int dur) {
-        shielded = true; shieldTimer = dur; shieldPulse = 0;
-    }
-    public void activateOverdrive() {
-        overdrive = true;
-        overdriveTimer = Constants.OVERDRIVE_DURATION;
-        overdrivePulse = 0;
-    }
-
-    public RectF getBounds() {
-        float s = size * 0.4f;
-        boundsRect.set(x - s, y - s*1.5f, x + s, y + s);
-        return boundsRect;
-    }
-
+    public void activateShield(int d) { shielded = true; shieldTimer = d; shieldPulse = 0; }
+    public void activateOverdrive() { overdrive = true; overdriveTimer = Constants.OVERDRIVE_DURATION; overdrivePulse = 0; }
+    public RectF getBounds() { float s = size*0.4f; boundsRect.set(x-s, y-s*1.5f, x+s, y+s); return boundsRect; }
     public void reset() {
-        x = screenW / 2f;
-        y = screenH * Constants.PLAYER_START_Y_RATIO;
-        prevX = x;
-        bankAngle = 0; targetBank = 0;
-        shielded = false; shieldTimer = 0;
-        overdrive = false; overdriveTimer = 0;
+        x = screenW/2f; y = screenH * Constants.PLAYER_START_Y_RATIO; prevX = x;
+        bankAngle = 0; targetBank = 0; comboTier = 0;
+        shielded = false; shieldTimer = 0; overdrive = false; overdriveTimer = 0;
         for (int i = 0; i < TRAIL_LEN; i++) { trailX[i] = x; trailY[i] = y; }
     }
 }

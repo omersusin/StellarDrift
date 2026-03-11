@@ -49,6 +49,21 @@ public class GameWorld {
     private float dangerLevel;
     private List<float[]> spawnWarnings;
 
+    // Near-miss flash lines
+    private List<float[]> nearMissFlashes;
+
+    // StarDust chain tracking
+    private int chainCounter;
+    private int chainTarget;
+    private boolean chainActive;
+
+    // Tutorial
+    private boolean firstStarDustSeen, firstNearMiss;
+
+    // Transition
+    private float transitionAlpha;
+    private boolean transitioningIn;
+
     private static final int[] MILESTONES = {1000, 2500, 5000, 10000, 25000, 50000};
 
     public GameWorld(int sw, int sh, Context ctx) {
@@ -66,27 +81,32 @@ public class GameWorld {
         powerUps = new ArrayList<>();
         popups = new ArrayList<>();
         spawnWarnings = new ArrayList<>();
+        nearMissFlashes = new ArrayList<>();
 
         state = Constants.STATE_MENU;
         tempoPhase = Constants.TEMPO_CALM;
         tempoTimer = Constants.TEMPO_CALM_DURATION;
+        transitionAlpha = 0;
     }
 
     public void update(float joyDirX, float joyDirY, float joyMag) {
         updatePopups();
         updateShake();
         updateShockwave();
+        updateNearMissFlashes();
+        updateTransition();
 
+        if (state == Constants.STATE_PAUSED) return;
         if (state != Constants.STATE_PLAYING) return;
         if (freezeTimer > 0) { freezeTimer--; if (freezeTimer <= 0) triggerGameOver(); return; }
 
         frameCount++;
         float speedMult = settings.getSpeedMultiplier();
         float gameSpeedMult = settings.getGameSpeedMultiplier();
-        difficulty = Math.min(Constants.MAX_DIFFICULTY,
-            1f + frameCount * Constants.DIFFICULTY_RATE);
+        difficulty = Math.min(Constants.MAX_DIFFICULTY, 1f + frameCount * Constants.DIFFICULTY_RATE);
 
         player.update(joyDirX, joyDirY, joyMag);
+        player.setComboTier(combo);
         updateTimers();
         updateTempo();
         updateDangerLevel();
@@ -104,7 +124,7 @@ public class GameWorld {
 
     private void updateTimers() {
         if (nearMissCooldown > 0) nearMissCooldown--;
-        if (combo > 0) { comboTimer--; if (comboTimer <= 0) { combo = 0; overdriveTriggered = false; } }
+        if (combo > 0) { comboTimer--; if (comboTimer <= 0) { combo = 0; overdriveTriggered = false; chainActive = false; } }
         if (magnetActive) { magnetTimer--; if (magnetTimer <= 0) magnetActive = false; }
         if (slowmoActive) { slowmoTimer--; if (slowmoTimer <= 0) slowmoActive = false; }
         if (doubleActive) { doubleTimer--; if (doubleTimer <= 0) doubleActive = false; }
@@ -123,6 +143,18 @@ public class GameWorld {
             shakeY = (float)(Math.random() * shakeIntensity * 2 - shakeIntensity);
             shakeIntensity *= Constants.SHAKE_DECAY;
         } else { shakeX = 0; shakeY = 0; shakeIntensity = 0; }
+    }
+
+    private void updateNearMissFlashes() {
+        Iterator<float[]> it = nearMissFlashes.iterator();
+        while (it.hasNext()) { float[] f = it.next(); f[4]--; if (f[4] <= 0) it.remove(); }
+    }
+
+    private void updateTransition() {
+        if (transitioningIn) {
+            transitionAlpha -= Constants.TRANSITION_SPEED_IN;
+            if (transitionAlpha <= 0) { transitionAlpha = 0; transitioningIn = false; }
+        }
     }
 
     private void updateTempo() {
@@ -157,12 +189,39 @@ public class GameWorld {
 
         float sdMult = getTempoStarDustMult();
         int sdInt = Math.max(8, (int)(Constants.STARDUST_SPAWN_INTERVAL / (difficulty * sdMult)));
-        if (frameCount % sdInt == 0) starDusts.add(new StarDust(screenW, screenH));
+        if (frameCount % sdInt == 0) {
+            if (Math.random() < Constants.STARDUST_CHAIN_CHANCE && !chainActive) {
+                spawnStarDustChain();
+            } else {
+                starDusts.add(new StarDust(screenW, screenH));
+            }
+        }
 
         powerUpSpawnTimer++;
         if (powerUpSpawnTimer >= Constants.POWERUP_SPAWN_INTERVAL) {
             powerUpSpawnTimer = 0;
             powerUps.add(new PowerUp(screenW, screenH, (int)(Math.random() * 4)));
+        }
+    }
+
+    private void spawnStarDustChain() {
+        int count = Constants.STARDUST_CHAIN_MIN +
+            (int)(Math.random() * (Constants.STARDUST_CHAIN_MAX - Constants.STARDUST_CHAIN_MIN + 1));
+        chainTarget = count;
+        chainCounter = 0;
+        chainActive = true;
+
+        float startX = screenW * 0.15f + (float)(Math.random() * screenW * 0.7f);
+        float endX = screenW * 0.15f + (float)(Math.random() * screenW * 0.7f);
+
+        for (int i = 0; i < count; i++) {
+            float t = (float) i / (count - 1);
+            float cx = startX + (endX - startX) * t;
+            float cy = -(i * 100 + 50);
+            float wobble = (float)(Math.sin(i * 1.2) * screenW * 0.04);
+            StarDust sd = new StarDust(screenW, screenH);
+            sd.setPosition(cx + wobble, cy);
+            starDusts.add(sd);
         }
     }
 
@@ -201,7 +260,10 @@ public class GameWorld {
 
         Iterator<StarDust> si = starDusts.iterator();
         while (si.hasNext()) { StarDust s = si.next();
-            if (RectF.intersects(pb, s.getBounds())) { collectStarDust(s); si.remove(); }
+            if (RectF.intersects(pb, s.getBounds())) {
+                if (!firstStarDustSeen) firstStarDustSeen = true;
+                collectStarDust(s); si.remove();
+            }
         }
 
         Iterator<PowerUp> pui = powerUps.iterator();
@@ -218,7 +280,7 @@ public class GameWorld {
                 float dist = (float) Math.sqrt(dx * dx + dy * dy);
                 float threshold = (player.getSize() + a.getSize()) * Constants.NEAR_MISS_RANGE;
                 float hitDist = (player.getSize() + a.getSize()) * 0.65f;
-                if (dist < threshold && dist > hitDist) { onNearMiss(px, py); break; }
+                if (dist < threshold && dist > hitDist) { onNearMiss(px, py, a.getX(), a.getY()); break; }
             }
         }
     }
@@ -232,6 +294,18 @@ public class GameWorld {
         if (riskWindowActive) pts = (int)(pts * Constants.RISK_WINDOW_MULT);
         int fp = pts * cm;
         score += fp; orbsCollected++;
+
+        if (chainActive) {
+            chainCounter++;
+            if (chainCounter >= chainTarget) {
+                chainActive = false;
+                int chainBonus = Constants.STARDUST_CHAIN_BONUS * chainTarget;
+                score += chainBonus;
+                popups.add(new ScorePopup(s.getX(), s.getY() - 40, "CHAIN +" + chainBonus + "!", 0xFF00E5FF));
+                spawnParticles(s.getX(), s.getY(), 20, 0xFF00E5FF);
+            }
+        }
+
         popups.add(ScorePopup.createCollect(s.getX(), s.getY(), fp, cm));
         spawnParticles(s.getX(), s.getY(), Constants.COLLECT_PARTICLES, 0xFFFFD740);
         sound.playCollect(); vibration.vibrateCollect();
@@ -253,13 +327,15 @@ public class GameWorld {
         }
     }
 
-    private void onNearMiss(float px, float py) {
+    private void onNearMiss(float px, float py, float ax, float ay) {
         nearMissCooldown = Constants.NEAR_MISS_COOLDOWN; nearMissCount++;
+        if (!firstNearMiss) firstNearMiss = true;
         int bonus = Constants.NEAR_MISS_BONUS;
         if (riskWindowActive) bonus = (int)(bonus * Constants.RISK_WINDOW_MULT);
         score += bonus;
         popups.add(ScorePopup.createNearMiss(px, py));
         riskWindowActive = true; riskWindowTimer = Constants.RISK_WINDOW_DURATION;
+        nearMissFlashes.add(new float[]{px, py, ax, ay, Constants.NEAR_MISS_FLASH_LIFE});
     }
 
     private void checkOverdrive() {
@@ -277,12 +353,16 @@ public class GameWorld {
         spawnParticles(a.getX(), a.getY(), Constants.EXPLOSION_PARTICLES / 2, 0xFF78909C);
         sound.playExplosion(); vibration.vibrateExplosion();
         shakeIntensity = Constants.SHAKE_INTENSITY;
-        shockwaveActive = true; shockwaveX = px; shockwaveY = py;
-        shockwaveRadius = 0; shockwaveAlpha = 1f;
+        shockwaveActive = true; shockwaveX = px; shockwaveY = py; shockwaveRadius = 0; shockwaveAlpha = 1f;
         freezeTimer = Constants.FREEZE_FRAMES;
     }
 
-    private void triggerGameOver() { state = Constants.STATE_GAME_OVER; settings.setHighScore(score); sound.playGameOver(); }
+    private void triggerGameOver() {
+        state = Constants.STATE_GAME_OVER;
+        settings.setHighScore(score);
+        settings.incrementGamesPlayed();
+        sound.playGameOver();
+    }
 
     private void updateShockwave() {
         if (!shockwaveActive) return;
@@ -312,8 +392,7 @@ public class GameWorld {
             float dist = (float) Math.sqrt(dx * dx + dy * dy) - a.getSize();
             if (dist < minDist) minDist = dist;
         }
-        float sr = screenW * 0.2f;
-        dangerLevel = Math.max(0, Math.min(1f, 1f - minDist / sr));
+        dangerLevel = Math.max(0, Math.min(1f, 1f - minDist / (screenW * 0.2f)));
     }
 
     private void spawnParticles(float px, float py, int count, int color) {
@@ -328,9 +407,9 @@ public class GameWorld {
     }
 
     private int tweakColor(int b) {
-        int r = Math.min(255, Math.max(0, ((b >> 16) & 0xFF) + (int)(Math.random() * 40 - 20)));
-        int g = Math.min(255, Math.max(0, ((b >> 8) & 0xFF) + (int)(Math.random() * 40 - 20)));
-        int bl = Math.min(255, Math.max(0, (b & 0xFF) + (int)(Math.random() * 40 - 20)));
+        int r = Math.min(255, Math.max(0, ((b >> 16)&0xFF) + (int)(Math.random()*40-20)));
+        int g = Math.min(255, Math.max(0, ((b >> 8)&0xFF) + (int)(Math.random()*40-20)));
+        int bl = Math.min(255, Math.max(0, (b&0xFF) + (int)(Math.random()*40-20)));
         return 0xFF000000 | (r << 16) | (g << 8) | bl;
     }
 
@@ -340,6 +419,7 @@ public class GameWorld {
         Iterator<PowerUp> pi = powerUps.iterator(); while (pi.hasNext()) if (pi.next().isOffScreen(screenH)) pi.remove();
     }
 
+    // State management
     public void handleTap() {
         if (state == Constants.STATE_GAME_OVER) { state = Constants.STATE_MENU; sound.playClick(); vibration.vibrateClick(); }
     }
@@ -355,14 +435,19 @@ public class GameWorld {
         shakeIntensity = 0; shakeX = 0; shakeY = 0;
         orbsCollected = 0; nearMissCount = 0; maxCombo = 0;
         lastMilestone = 0; milestoneText = null; milestoneTimer = 0;
-        dangerLevel = 0; tempoPhase = Constants.TEMPO_CALM;
-        tempoTimer = Constants.TEMPO_CALM_DURATION;
+        dangerLevel = 0; tempoPhase = Constants.TEMPO_CALM; tempoTimer = Constants.TEMPO_CALM_DURATION;
+        chainActive = false; chainCounter = 0; chainTarget = 0;
+        firstStarDustSeen = false; firstNearMiss = false;
+        transitionAlpha = 1f; transitioningIn = true;
         startTime = System.currentTimeMillis();
         asteroids.clear(); starDusts.clear(); particles.clear();
-        powerUps.clear(); popups.clear(); spawnWarnings.clear();
+        powerUps.clear(); popups.clear(); spawnWarnings.clear(); nearMissFlashes.clear();
         player.reset();
     }
 
+    public void pauseGame() { if (state == Constants.STATE_PLAYING) state = Constants.STATE_PAUSED; }
+    public void resumeGame() { if (state == Constants.STATE_PAUSED) state = Constants.STATE_PLAYING; }
+    public void quitToMenu() { state = Constants.STATE_MENU; }
     public void openSettings() { state = Constants.STATE_SETTINGS; }
     public void closeSettings() { state = Constants.STATE_MENU; }
     public void cycleDifficulty() { settings.cycleDifficulty(); sound.playClick(); vibration.vibrateClick(); }
@@ -370,6 +455,7 @@ public class GameWorld {
     public void toggleSound() { settings.toggleSound(); sound.setEnabled(settings.isSoundEnabled()); if (settings.isSoundEnabled()) sound.playClick(); }
     public void toggleVibration() { settings.toggleVibration(); vibration.setEnabled(settings.isVibrationEnabled()); vibration.vibrateClick(); }
 
+    // Getters
     public int getState() { return state; }
     public int getScore() { return score; }
     public int getHighScore() { return settings.getHighScore(); }
@@ -382,7 +468,6 @@ public class GameWorld {
     public List<ScorePopup> getPopups() { return popups; }
     public SettingsManager getSettings() { return settings; }
     public int getCombo() { return combo; }
-    public int getComboTimer() { return comboTimer; }
     public boolean isMagnetActive() { return magnetActive; }
     public boolean isSlowmoActive() { return slowmoActive; }
     public boolean isDoubleActive() { return doubleActive; }
@@ -409,5 +494,10 @@ public class GameWorld {
     public String getMilestoneText() { return milestoneText; }
     public int getMilestoneTimer() { return milestoneTimer; }
     public List<float[]> getSpawnWarnings() { return spawnWarnings; }
+    public List<float[]> getNearMissFlashes() { return nearMissFlashes; }
+    public float getTransitionAlpha() { return transitionAlpha; }
+    public boolean isFirstStarDustSeen() { return firstStarDustSeen; }
+    public boolean isFirstNearMiss() { return firstNearMiss; }
+    public int getFrameCount() { return frameCount; }
     public void releaseResources() { if (sound != null) sound.release(); }
 }
