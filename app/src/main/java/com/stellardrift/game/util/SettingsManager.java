@@ -2,12 +2,16 @@ package com.stellardrift.game.util;
 
 import android.content.Context;
 import android.content.SharedPreferences;
+import com.stellardrift.game.world.ShipRegistry;
 
 public class SettingsManager {
-
-    private SharedPreferences prefs;
-    private int difficulty, gameSpeed, highScore, gamesPlayed;
-    private boolean vibrationEnabled, soundEnabled;
+    private final SharedPreferences prefs;
+    private int difficulty;
+    private int gameSpeed;
+    private boolean vibrationEnabled;
+    private boolean soundEnabled;
+    private int highScore;
+    private int gamesPlayed;
 
     public SettingsManager(Context context) {
         prefs = context.getSharedPreferences(Constants.PREFS_NAME, Context.MODE_PRIVATE);
@@ -35,6 +39,7 @@ public class SettingsManager {
     }
 
     public int getDifficulty() { return difficulty; }
+    public void setDifficulty(int diff) { this.difficulty = diff; save(); }
     public void cycleDifficulty() { difficulty = (difficulty + 1) % 3; save(); }
     public float getSpeedMultiplier() { return Constants.DIFF_SPEED_MULT[difficulty]; }
     public int getSpawnInterval() { return Constants.DIFF_SPAWN_MULT[difficulty]; }
@@ -42,14 +47,18 @@ public class SettingsManager {
     public int getDifficultyColor() { return Constants.DIFF_COLORS[difficulty]; }
 
     public int getGameSpeed() { return gameSpeed; }
+    public void setGameSpeed(int spd) { this.gameSpeed = spd; save(); }
     public void cycleGameSpeed() { gameSpeed = (gameSpeed + 1) % 3; save(); }
     public float getGameSpeedMultiplier() { return Constants.SPEED_MULT[gameSpeed]; }
     public String getGameSpeedName() { return Constants.SPEED_NAMES[gameSpeed]; }
     public int getGameSpeedColor() { return Constants.SPEED_COLORS[gameSpeed]; }
 
     public boolean isSoundEnabled() { return soundEnabled; }
+    public void setSoundEnabled(boolean s) { this.soundEnabled = s; save(); }
     public void toggleSound() { soundEnabled = !soundEnabled; save(); }
+
     public boolean isVibrationEnabled() { return vibrationEnabled; }
+    public void setVibrationEnabled(boolean v) { this.vibrationEnabled = v; save(); }
     public void toggleVibration() { vibrationEnabled = !vibrationEnabled; save(); }
 
     public int getHighScore() { return highScore; }
