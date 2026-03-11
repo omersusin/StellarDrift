@@ -11,7 +11,6 @@ public class Player {
 
     private float x, y, prevX;
     
-    // ── Velocity-Based Fizik (YENİ) ──
     private float velX = 0f, velY = 0f;
     private static final float ACCELERATION = 18f;
     private static final float FRICTION = 12f;
@@ -47,7 +46,6 @@ public class Player {
     private int overdriveTimer;
     private float overdrivePulse;
 
-    // Overcharge (Plasma Core)
     private float overchargeSpeedBoost = 1.0f;
 
     private ShipData currentShip;
@@ -96,14 +94,13 @@ public class Player {
     }
 
     private int getTrailColor() {
-        if (overdrive || overchargeSpeedBoost > 1.5f) return 0xFFFF6D00; // Turuncu
+        if (overdrive || overchargeSpeedBoost > 1.5f) return 0xFFFF6D00; 
         return Constants.COMBO_TRAIL_COLORS[Math.min(comboTier, Constants.COMBO_TRAIL_COLORS.length - 1)];
     }
 
     public void update(float joystickX, float joystickY, float magnitude, float dt) {
         prevX = x;
         
-        // ── 1. HEDEF HIZ HESAPLA ──
         float fuelSpeedMult = (fuelSystem != null) ? fuelSystem.getSpeedMultiplier() : 1.0f;
         float shipSpeedMult = (currentShip != null) ? currentShip.speedMultiplier : 1.0f;
         
@@ -120,13 +117,11 @@ public class Player {
             targetVelX = joystickX * maxSpeed * adjMag;
             targetVelY = joystickY * maxSpeed * adjMag;
         } else {
-            // Idle Hover: Eğer joystick hareket etmiyorsa yavaşça süzül (Lissajous)
             idleHoverTimer += dt;
             targetVelX = (float) Math.sin(idleHoverTimer * 1.1f) * 1.5f * 60f * fuelSpeedMult;
             targetVelY = (float) Math.sin(idleHoverTimer * 0.8f + 0.7f) * 2.0f * 60f * fuelSpeedMult;
         }
 
-        // ── 2. ACCELERATION / FRICTION UYGULA (Yağ gibi akma) ──
         if (joystickActive) {
             velX += (targetVelX - velX) * ACCELERATION * dt;
             velY += (targetVelY - velY) * ACCELERATION * dt;
@@ -134,7 +129,6 @@ public class Player {
             velX -= velX * FRICTION * dt;
             velY -= velY * FRICTION * dt;
             
-            // Hover hızını zorla uygula ki sıfırlanmasın
             velX += (targetVelX - velX) * (ACCELERATION * 0.5f) * dt;
             velY += (targetVelY - velY) * (ACCELERATION * 0.5f) * dt;
 
@@ -142,7 +136,6 @@ public class Player {
             if (Math.abs(velY) < VELOCITY_DEADZONE) velY = 0;
         }
 
-        // ── 3. HIZ LİMİTİ (Diagonal aşımı önle) ──
         float currentVelMag = (float) Math.sqrt(velX * velX + velY * velY);
         if (currentVelMag > maxSpeed && joystickActive) {
             float scale = maxSpeed / currentVelMag;
@@ -150,23 +143,19 @@ public class Player {
             velY *= scale;
         }
 
-        // ── 4. POZİSYON GÜNCELLE ──
         x += velX * dt;
         y += velY * dt;
 
-        // ── 5. EKRAN SINIRLARI (Yumuşak sınırlama) ──
         float margin = getSize();
         if (x < margin) { x = margin; velX = Math.max(0, velX); }
         if (x > screenW - margin) { x = screenW - margin; velX = Math.min(0, velX); }
         if (y < screenH * Constants.PLAYER_Y_MIN_RATIO) { y = screenH * Constants.PLAYER_Y_MIN_RATIO; velY = Math.max(0, velY); }
         if (y > screenH * Constants.PLAYER_Y_MAX_RATIO) { y = screenH * Constants.PLAYER_Y_MAX_RATIO; velY = Math.min(0, velY); }
 
-        // ── 6. BANKING (Eğilme - Artık velX'e bağlı, daha organik) ──
         float normalizedVelX = velX / Math.max(maxSpeed, 1f);
         targetBank = -normalizedVelX * Constants.PLAYER_MAX_BANK_ANGLE;
         bankAngle += (targetBank - bankAngle) * Constants.PLAYER_BANK_SPEED * (dt * 60f);
 
-        // Trail & Afterimage güncellemeleri
         trailIdx = (trailIdx + 1) % TRAIL_LEN; trailX[trailIdx] = x; trailY[trailIdx] = y;
 
         afterFrameSkip++;
@@ -244,11 +233,16 @@ public class Player {
 
     public float getX() { return x; } public float getY() { return y; }
     public float getSize() { return currentShip.collisionRadius * scaleMultiplier; } 
+    
+    // EKSIK OLAN METOD:
+    public float getCollisionRadius() { return getSize(); }
+
     public float getBankAngle() { return bankAngle; }
     public boolean isShielded() { return shielded; } public boolean isOverdrive() { return overdrive; }
     public void activateShield(int d) { shielded = true; shieldTimer = d; shieldPulse = 0; }
     public void activateOverdrive() { overdrive = true; overdriveTimer = Constants.OVERDRIVE_DURATION; overdrivePulse = 0; }
     public RectF getBounds() { float s = getSize() * 0.8f; boundsRect.set(x-s, y-s*1.5f, x+s, y+s); return boundsRect; }
+    
     public void reset() {
         x = screenW/2f; y = screenH * Constants.PLAYER_START_Y_RATIO; prevX = x;
         velX = 0; velY = 0;
