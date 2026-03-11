@@ -9,12 +9,18 @@ public class ShipData {
     public final String name;
     public final String description;
 
+    // EKSIK OLAN FILEDLAR: Player ve ProjectileSystem tarafindan dogrudan cagiriliyor
+    public final float speedMultiplier;
+    public final float fireRate;
+    public final int damage;
+    public final float projectileSpeed;
+    
     public final float baseSpeed;
     public final float baseFireRate;
     public final int baseDamage;
     public final float baseProjectileSpeed;
+    
     public final int projectileCount;
-
     public final int price;
     public boolean unlocked;
 
@@ -59,10 +65,19 @@ public class ShipData {
         this.id = id;
         this.name = name;
         this.description = desc;
+        
+        // Base stat atamalari
         this.baseSpeed = speed;
         this.baseFireRate = fireRate;
         this.baseDamage = damage;
         this.baseProjectileSpeed = projSpeed;
+        
+        // EKSIK OLAN FIELD'LARIN ATAMALARI (Geriye Uyumluluk)
+        this.speedMultiplier = speed;
+        this.fireRate = fireRate;
+        this.damage = damage;
+        this.projectileSpeed = projSpeed;
+        
         this.projectileCount = projCount;
         this.price = price;
         this.unlocked = (id == 0);
