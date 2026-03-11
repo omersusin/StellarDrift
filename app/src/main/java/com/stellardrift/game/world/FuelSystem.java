@@ -25,7 +25,7 @@ public class FuelSystem {
     private float warningPulse = 0f;    
     private boolean isCritical = false; 
     
-    private boolean drainPaused = false; // God Mode için eklendi
+    private boolean drainPaused = false; 
 
     private final Paint barBgPaint = new Paint();
     private final Paint barFillPaint = new Paint();
@@ -71,9 +71,7 @@ public class FuelSystem {
         warningPaint.setStyle(Paint.Style.FILL);
     }
     
-    public void setDrainPaused(boolean paused) {
-        this.drainPaused = paused;
-    }
+    public void setDrainPaused(boolean paused) { this.drainPaused = paused; }
 
     public void update(float dt) {
         if (!drainPaused) {
@@ -117,31 +115,26 @@ public class FuelSystem {
         barFlashTimer = 0.3f;
     }
 
-    public void onStarDustCollected() { addFuel(FUEL_PER_STARDUST); }
+    // YENİ: Double Power-Up Destekli Yakıt Alma
+    public void onStarDustCollected(float multiplier) { addFuel(FUEL_PER_STARDUST * multiplier); }
+    public void onStarDustCollected() { addFuel(FUEL_PER_STARDUST); } // Fallback
     public void onChainCompleted() { addFuel(FUEL_BONUS_CHAIN); }
 
     public float getSpeedMultiplier() { return speedMultiplier; }
     public boolean isCritical() { return isCritical; }
 
     public void reset() {
-        currentFuel = MAX_FUEL;
-        displayedFuel = MAX_FUEL;
-        speedMultiplier = SPEED_AT_FULL;
-        barFlashTimer = 0f;
-        pulseTimer = 0f;
-        isCritical = false;
-        drainPaused = false;
+        currentFuel = MAX_FUEL; displayedFuel = MAX_FUEL; speedMultiplier = SPEED_AT_FULL;
+        barFlashTimer = 0f; pulseTimer = 0f; isCritical = false; drainPaused = false;
     }
 
     public void draw(Canvas canvas) {
         float ratio = displayedFuel / MAX_FUEL;
-
         barRect.set(barX, barY, barX + barWidth, barY + barHeight);
         canvas.drawRoundRect(barRect, barWidth / 2, barWidth / 2, barBgPaint);
 
         float fillHeight = barHeight * ratio;
         float fillTop = barY + barHeight - fillHeight;
-
         int fillColor = getFuelColor(ratio);
 
         if (barFlashTimer > 0) {
@@ -159,7 +152,6 @@ public class FuelSystem {
         if (ratio > 0.05f) {
             int glowAlpha = (int)(40 + 30 * ratio);
             if (barFlashTimer > 0) glowAlpha += (int)(80 * (barFlashTimer / 0.3f));
-
             barGlowPaint.setColor(Color.argb(glowAlpha, Color.red(fillColor), Color.green(fillColor), Color.blue(fillColor)));
             float glowH = barWidth * 0.8f;
             glowRect.set(barX - 3, fillTop - glowH / 2, barX + barWidth + 3, fillTop + glowH / 2);
@@ -196,7 +188,6 @@ public class FuelSystem {
         int warnAlpha = (int)(warningPulse * 35);
         warningPaint.setColor(Color.argb(warnAlpha, 255, 30, 20));
         canvas.drawRect(0, barY, barX + barWidth + 20, barY + barHeight, warningPaint);
-
         if (warningPulse > 0.5f) {
             labelPaint.setColor(Color.argb((int)(warningPulse * 220), 255, 60, 40));
             labelPaint.setTextSize(screenWidth * 0.022f);
