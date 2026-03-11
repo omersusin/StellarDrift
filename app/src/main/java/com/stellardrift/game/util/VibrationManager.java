@@ -28,9 +28,13 @@ public class VibrationManager {
     public void vibrateHit() { vibrate(15, 80); }
     
     // ═════════════════════════════════════════════════
-    // EKSIK OLAN METOD BURADA EKLENDİ
+    // EKSIK OLAN TÜM PATLAMA METODLARI
     // ═════════════════════════════════════════════════
+    // GameWorld.java'da overdrive/god mode icin cagriliyor:
     public void vibrateExplosion() { vibratePattern(new long[]{0, 40, 30, 80, 20, 50}, new int[]{0, 200, 0, 255, 0, 180}); }
+    
+    // GameWorld.java'da mermiyle asteroid patlatinca cagriliyor:
+    public void vibrateExplode() { vibratePattern(new long[]{0, 40, 30, 60}, new int[]{0, 200, 0, 220}); }
     
     public void vibrateCollect() { vibrate(10, 50); }
     public void vibratePowerUp() { vibrate(25, 120); }
