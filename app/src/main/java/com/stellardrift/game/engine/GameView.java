@@ -76,8 +76,6 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback {
         if (shipRenderer == null) shipRenderer = new ShipRenderer();
         if (uiOverlay == null) {
             uiOverlay = new UIOverlay(screenW, screenH);
-            
-            // HATA ÇÖZÜMÜ: initPrefs artık ShipRegistry de alıyor
             uiOverlay.initPrefs(gameWorld.getSettings(), gameWorld.getShipRegistry());
             uiOverlay.setFuelSystem(gameWorld.getFuelSystem());
         }

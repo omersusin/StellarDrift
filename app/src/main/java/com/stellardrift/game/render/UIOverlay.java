@@ -46,8 +46,12 @@ public class UIOverlay {
     private final Paint menuBtnBorderPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint menuBtnTextPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint menuCreditPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-    
     private final Paint creditPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+
+    // ── EKSİK OLAN PAINT'LER BURAYA EKLENDİ ──
+    private Paint borderPaint; 
+    private Paint buttonPaint; 
+
     private Paint titlePaint, subtitlePaint, scorePaint, smallPaint;
     private Paint cardPaint, cardBorderPaint, btnTextPaint, textPaint; 
     private Paint dimPaint, labelPaint, valuePaint, accentPaint;
@@ -80,6 +84,9 @@ public class UIOverlay {
     private int touchDownY = -1, lastTouchY = -1;
     private boolean isDraggingShop = false;
     
+    // ── EKSİK OLAN FLOAT BURAYA EKLENDİ ──
+    private float cardPadding;
+
     private float cardWidth, cardHeight, cardSpacing, cardStartY, totalContentHeight;
     private float cardLeftX, previewSize, previewCenterX, infoPanelX, infoPanelWidth;
     private float statLabelWidth, statBarWidth, upgradeBtnWidth, upgradeBtnHeight, statGap, barBtnGap;
@@ -106,7 +113,10 @@ public class UIOverlay {
         
         cardPaint = new Paint(Paint.ANTI_ALIAS_FLAG); cardPaint.setStyle(Paint.Style.FILL);
         cardBorderPaint = new Paint(Paint.ANTI_ALIAS_FLAG); cardBorderPaint.setStyle(Paint.Style.STROKE);
+        
+        // EKSİK PAINT İNİTLERİ
         borderPaint = new Paint(Paint.ANTI_ALIAS_FLAG); borderPaint.setStyle(Paint.Style.STROKE); borderPaint.setStrokeWidth(1.5f);
+        buttonPaint = new Paint(Paint.ANTI_ALIAS_FLAG); buttonPaint.setStyle(Paint.Style.FILL);
         
         btnTextPaint = makePaint(WHITE, sw * 0.045f, Paint.Align.CENTER, true);
         textPaint = makePaint(WHITE, sw * 0.04f, Paint.Align.LEFT, false);
@@ -157,12 +167,35 @@ public class UIOverlay {
         shopBtn.set(cx - bw/2, sh * 0.55f, cx + bw/2, sh * 0.55f + bh);
         settingsBtn.set(cx - bw/2, sh * 0.65f, cx + bw/2, sh * 0.65f + bh);
         
-        cardPadding = sw * 0.03f; cardWidth = sw - cardPadding * 2; cardHeight = Math.max(260, Math.min(320, sh * 0.33f)); cardSpacing = sh * 0.015f; cardStartY = sh * 0.11f; cardLeftX = cardPadding;
-        float innerPad = cardWidth * 0.035f; previewSize = Math.min(cardWidth * 0.22f, 100); previewCenterX = cardLeftX + innerPad + previewSize / 2;
-        float previewAreaWidth = previewSize + innerPad * 2; infoPanelX = cardLeftX + previewAreaWidth; infoPanelWidth = cardWidth - previewAreaWidth - innerPad;
-        statLabelWidth = infoPanelWidth * 0.12f; statGap = infoPanelWidth * 0.02f; upgradeBtnWidth = infoPanelWidth * 0.26f; upgradeBtnHeight = Math.max(16, Math.min(22, cardHeight * 0.06f)); barBtnGap = infoPanelWidth * 0.02f;
+        initLayout(sw, sh);
+    }
+
+    private void initLayout(float w, float h) {
+        cardPadding = w * 0.03f; // EKSİK FLOAT BURADA EKLİYDİ
+        cardWidth = w - cardPadding * 2; 
+        cardHeight = Math.max(260, Math.min(320, h * 0.33f)); 
+        cardSpacing = h * 0.015f; 
+        cardStartY = h * 0.11f; 
+        cardLeftX = cardPadding;
+        
+        float innerPad = cardWidth * 0.035f; 
+        previewSize = Math.min(cardWidth * 0.22f, 100); 
+        previewCenterX = cardLeftX + innerPad + previewSize / 2;
+        
+        float previewAreaWidth = previewSize + innerPad * 2; 
+        infoPanelX = cardLeftX + previewAreaWidth; 
+        infoPanelWidth = cardWidth - previewAreaWidth - innerPad;
+        
+        statLabelWidth = infoPanelWidth * 0.12f; 
+        statGap = infoPanelWidth * 0.02f; 
+        upgradeBtnWidth = infoPanelWidth * 0.26f; 
+        upgradeBtnHeight = Math.max(16, Math.min(22, cardHeight * 0.06f)); 
+        barBtnGap = infoPanelWidth * 0.02f;
+        
         statBarWidth = Math.max(40, infoPanelWidth - statLabelWidth - statGap - barBtnGap - upgradeBtnWidth);
-        mainBtnWidth = Math.max(100, Math.min(140, infoPanelWidth * 0.48f)); mainBtnHeight = Math.max(30, Math.min(38, cardHeight * 0.12f)); cardRight = cardLeftX + cardWidth;
+        mainBtnWidth = Math.max(100, Math.min(140, infoPanelWidth * 0.48f)); 
+        mainBtnHeight = Math.max(30, Math.min(38, cardHeight * 0.12f)); 
+        cardRight = cardLeftX + cardWidth;
     }
 
     private Paint makePaint(int color, float size, Paint.Align align, boolean bold) {
@@ -229,7 +262,7 @@ public class UIOverlay {
         menuTitlePaint2.setColor(Color.rgb(80, 195, 255)); menuTitlePaint2.setTextSize(sw * 0.14f); menuTitlePaint2.setTextAlign(Paint.Align.CENTER); menuTitlePaint2.setFakeBoldText(true); menuTitlePaint2.setStyle(Paint.Style.FILL); menuTitlePaint2.setShader(null); menuTitlePaint2.setAlpha(255);
         c.drawText("DRIFT", sw / 2f, titleY + sh * 0.06f, menuTitlePaint2);
         menuSubPaint.setColor(Color.argb(100, 170, 180, 200)); menuSubPaint.setTextSize(sw * 0.035f); menuSubPaint.setTextAlign(Paint.Align.CENTER); menuSubPaint.setFakeBoldText(false); menuSubPaint.setStyle(Paint.Style.FILL); menuSubPaint.setShader(null); menuSubPaint.setAlpha(100);
-        c.drawText("v4.5 — Upgrade Edition", sw / 2f, titleY + sh * 0.09f, menuSubPaint);
+        c.drawText("v4.8 — Ultimate Edition", sw / 2f, titleY + sh * 0.09f, menuSubPaint);
         
         drawMenuButton(c, "▶ PLAY", playBtn, Color.argb(185, 18, 28, 48), Color.argb(150, 70, 170, 255), Color.WHITE);
         drawMenuButton(c, "✦ SHOP", shopBtn, Color.argb(175, 28, 26, 38), Color.argb(140, 195, 165, 38), Color.rgb(228, 198, 55));
@@ -249,14 +282,16 @@ public class UIOverlay {
         c.drawText(text, sw / 2f, outRect.top + outRect.height()/2 + outRect.height()*0.12f, menuBtnTextPaint);
     }
 
+    private void drawMenuButton(Canvas c, String text, float y, float h, int bgCol, int borderCol, int textCol, RectF outRect) {
+        float w = sw * 0.55f; float bx = sw / 2f - w / 2f; outRect.set(bx, y, bx + w, y + h); drawMenuButton(c, text, outRect, bgCol, borderCol, textCol);
+    }
+
     private void drawSettingsScreen(Canvas c, boolean godMode) {
-        bgBlackPaint.setColor(Color.argb(255, 0, 0, 0)); c.drawRect(0, 0, sw, sh, bgBlackPaint);
-        bgOverlayPaint.setColor(Color.argb(245, 8, 10, 20)); c.drawRect(0, 0, sw, sh, bgOverlayPaint);
+        bgBlackPaint.setColor(Color.argb(255, 0, 0, 0)); c.drawRect(0, 0, sw, sh, bgBlackPaint); bgOverlayPaint.setColor(Color.argb(245, 8, 10, 20)); c.drawRect(0, 0, sw, sh, bgOverlayPaint);
         float cw = sw * 0.9f; float ch = sh * 0.6f; float cx = sw * 0.05f; float cy = sh * 0.2f;
         tempRect.set(cx, cy, cx + cw, cy + ch); cardPaint.setColor(Color.argb(220, 18, 22, 35)); cardPaint.setStyle(Paint.Style.FILL); c.drawRoundRect(tempRect, 30, 30, cardPaint);
         cardBorderPaint.setColor(Color.argb(80, 100, 120, 180)); cardBorderPaint.setStyle(Paint.Style.STROKE); c.drawRoundRect(tempRect, 30, 30, cardBorderPaint);
-        accentPaint.setColor(WHITE); accentPaint.setTextSize(sw * 0.07f); accentPaint.setShader(null); c.drawText("⚙ SETTINGS", sw / 2f, cy + sh * 0.07f, accentPaint);
-        c.drawLine(cx + 40, cy + sh * 0.09f, cx + cw - 40, cy + sh * 0.09f, dividerPaint);
+        accentPaint.setColor(WHITE); accentPaint.setTextSize(sw * 0.07f); accentPaint.setShader(null); c.drawText("⚙ SETTINGS", sw / 2f, cy + sh * 0.07f, accentPaint); c.drawLine(cx + 40, cy + sh * 0.09f, cx + cw - 40, cy + sh * 0.09f, dividerPaint);
         float rowY = cy + sh * 0.15f; float rowGap = sh * 0.09f;
         drawSettingsLabel(c, "DIFFICULTY", cx + 40, rowY); drawThreeWayToggle(c, cx + cw - sw*0.45f, rowY - sh*0.03f, sw*0.4f, sh*0.05f, difficultyLevel, new String[]{"EASY", "NORM", "HARD"}, new int[]{Color.rgb(60, 180, 80), Color.rgb(60, 140, 220), Color.rgb(220, 60, 50)}, 0); c.drawLine(cx + 40, rowY + sh*0.04f, cx + cw - 40, rowY + sh*0.04f, dividerPaint);
         rowY += rowGap; drawSettingsLabel(c, "GAME SPEED", cx + 40, rowY); drawThreeWayToggle(c, cx + cw - sw*0.45f, rowY - sh*0.03f, sw*0.4f, sh*0.05f, gameSpeedLevel, new String[]{"SLOW", "NORM", "FAST"}, new int[]{Color.rgb(100, 160, 200), Color.rgb(60, 140, 220), Color.rgb(240, 160, 30)}, 1); c.drawLine(cx + 40, rowY + sh*0.04f, cx + cw - 40, rowY + sh*0.04f, dividerPaint);
@@ -280,36 +315,39 @@ public class UIOverlay {
     }
 
     private void drawShipCard(Canvas c, ShipData ship, int shipIndex, float cardY, float alpha, EconomyManager economy, ShipRenderer renderer) {
-        float cx = (sw - cardWidth) / 2; boolean isSelected = (economy.getSelectedShipId() == ship.id); boolean isUnlocked = economy.isShipUnlocked(ship.id);
+        boolean isSelected = (economy.getSelectedShipId() == ship.id); boolean isUnlocked = economy.isShipUnlocked(ship.id);
         tempRect.set(cardLeftX, cardY, cardRight, cardY + cardHeight); cardPaint.setColor(isSelected ? Color.argb((int)(200 * alpha), 20, 40, 30) : Color.argb((int)(200 * alpha), 25, 25, 35)); c.drawRoundRect(tempRect, 24, 24, cardPaint);
         cardBorderPaint.setColor(isSelected ? Color.argb((int)(255 * alpha), 100, 255, 150) : Color.argb((int)(80 * alpha), 100, 150, 200)); cardBorderPaint.setStrokeWidth(isSelected ? 5f : 2f); c.drawRoundRect(tempRect, 24, 24, cardBorderPaint);
-        float previewX = cx + sw * 0.18f, previewY = cardY + sh * 0.12f; cardPaint.setColor(Color.argb((int)(50 * alpha), 80, 100, 150)); c.drawCircle(previewX, previewY, sw * 0.13f, cardPaint); renderer.drawShip(c, ship, previewX, previewY, 0f, (int)(255 * alpha), (sw/1080f) * 2.2f, false);
-        float infoX = cx + sw * 0.38f; labelPaint.setColor(Color.argb((int)(255 * alpha), Color.red(ship.cockpitColor), Color.green(ship.cockpitColor), Color.blue(ship.cockpitColor))); labelPaint.setTextSize(sw * 0.05f); labelPaint.setFakeBoldText(true); c.drawText(ship.name, infoX, cardY + sh * 0.04f, labelPaint);
-        textPaint.setColor(Color.argb((int)(160 * alpha), 200, 200, 220)); textPaint.setTextSize(sw * 0.028f); textPaint.setTextAlign(Paint.Align.LEFT);
-        String desc = ship.description; float descMaxW = infoPanelWidth - 10; if (textPaint.measureText(desc) > descMaxW) { while (desc.length() > 3 && textPaint.measureText(desc + "...") > descMaxW) desc = desc.substring(0, desc.length() - 1); desc += "..."; } c.drawText(desc, infoX, cardY + sh * 0.07f, textPaint);
-        float statStartY = cardY + sh * 0.10f; float barX = infoX + sw * 0.08f; float barW = cardWidth - (sw * 0.48f); float barH = sh * 0.012f; float rowH = sh * 0.045f;
-        for (int st = 0; st < ShipData.STAT_COUNT; st++) { drawStatRowWithUpgrade(c, ship, shipIndex, st, infoX, barX, barW, barH, statStartY + st * rowH, alpha, isUnlocked, economy); }
-        float mainBtnX = cardRight - mainBtnWidth - cardWidth * 0.04f; float mainBtnY = cardY + cardHeight - mainBtnHeight - cardHeight * 0.05f; mainButtonRects[shipIndex].set(mainBtnX, mainBtnY, mainBtnX + mainBtnWidth, mainBtnY + mainBtnHeight);
-        drawMainButton(c, ship, shipIndex, isSelected, isUnlocked, alpha, economy);
+        float prevCY = cardY + cardHeight * 0.38f; cardPaint.setColor(Color.argb((int)(50 * alpha), 80, 100, 150)); c.drawCircle(previewCenterX, prevCY, previewSize * 0.48f, cardPaint); float shipScale = Math.max(1.2f, Math.min(1.8f, previewSize / 70f)); renderer.drawShip(c, ship, previewCenterX, prevCY, 0f, (int)(255 * alpha), shipScale, false);
+        float textStartY = cardY + cardHeight * 0.1f; textPaint.setShader(null); textPaint.setAlpha((int)(255 * alpha)); textPaint.setTextSize(Math.min(18, sw * 0.04f)); textPaint.setFakeBoldText(true); textPaint.setTextAlign(Paint.Align.LEFT); textPaint.setStyle(Paint.Style.FILL); textPaint.setColor(Color.argb((int)(255 * alpha), Color.red(ship.cockpitColor), Color.green(ship.cockpitColor), Color.blue(ship.cockpitColor))); c.drawText(ship.name, infoPanelX, textStartY + 16, textPaint);
+        textPaint.setTextSize(Math.min(11, sw * 0.025f)); textPaint.setFakeBoldText(false); textPaint.setColor(Color.argb((int)(140 * alpha), 190, 195, 210)); String desc = ship.description; float descMaxW = infoPanelWidth - 10; if (textPaint.measureText(desc) > descMaxW) { while (desc.length() > 3 && textPaint.measureText(desc + "...") > descMaxW) desc = desc.substring(0, desc.length() - 1); desc += "..."; } c.drawText(desc, infoPanelX, textStartY + 34, textPaint);
+        float dividerY = textStartY + 42; dividerPaint.setColor(Color.argb((int)(30 * alpha), 150, 170, 200)); c.drawLine(infoPanelX, dividerY, infoPanelX + infoPanelWidth - 5, dividerY, dividerPaint);
+        float statStartY = dividerY + 12; float statRowH = Math.max(22, Math.min(30, cardHeight * 0.13f)); float barH = Math.max(7, Math.min(10, statRowH * 0.35f));
+        for (int st = 0; st < ShipData.STAT_COUNT; st++) { drawStatRowWithUpgrade(c, ship, shipIndex, st, statStartY + st * statRowH, barH, alpha, isUnlocked, economy); }
+        float mainBtnX = cardRight - mainBtnWidth - cardWidth * 0.04f; float mainBtnY = cardY + cardHeight - mainBtnHeight - cardHeight * 0.05f; mainButtonRects[shipIndex].set(mainBtnX, mainBtnY, mainBtnX + mainBtnWidth, mainBtnY + mainBtnHeight); drawMainButton(c, ship, shipIndex, isSelected, isUnlocked, alpha, economy);
         if (purchaseFlashShipId == ship.id && purchaseFlashTimer > 0) { float flash = purchaseFlashTimer / 0.8f; cardPaint.setColor(Color.argb((int)(flash * 50), 255, 220, 50)); tempRect.set(cardLeftX, cardY, cardRight, cardY + cardHeight); c.drawRoundRect(tempRect, 14, 14, cardPaint); }
     }
 
-    private void drawStatRowWithUpgrade(Canvas c, ShipData ship, int shipIndex, int statIndex, float labelX, float barX, float barW, float barH, float y, float alpha, boolean isUnlocked, EconomyManager economy) {
+    private void drawStatRowWithUpgrade(Canvas c, ShipData ship, int shipIndex, int statIndex, float rowY, float barH, float alpha, boolean isUnlocked, EconomyManager economy) {
+        float labelX = infoPanelX; float barX = infoPanelX + statLabelWidth + statGap; float upgBtnX = barX + statBarWidth + barBtnGap; float maxBtnRight = cardRight - cardWidth * 0.03f; if (upgBtnX + upgradeBtnWidth > maxBtnRight) upgBtnX = maxBtnRight - upgradeBtnWidth;
         String statName = ship.getStatName(statIndex); int statColor = ship.getStatColor(statIndex); float ratio = ship.getStatBarRatio(statIndex); int level = ship.getUpgradeLevel(statIndex);
-        textPaint.setTextSize(Math.min(10, sw * 0.023f)); textPaint.setFakeBoldText(true); textPaint.setColor(Color.argb((int)(160 * alpha), 180, 185, 200)); textPaint.setTextAlign(Paint.Align.LEFT); textPaint.setStyle(Paint.Style.FILL); textPaint.setShader(null); c.drawText(statName, labelX, y + barH + 1, textPaint);
-        tempRect.set(barX, y, barX + barW, y + barH); statBarBgPaint.setAlpha((int)(80 * alpha)); c.drawRoundRect(tempRect, barH/2, barH/2, statBarBgPaint);
-        float fillWidth = statBarWidth * Math.max(0, Math.min(1, ratio)); if (fillWidth > barH) { tempRect.set(barX, y, barX + fillWidth, y + barH); statBarFill.setColor(Color.argb((int)(200 * alpha), Color.red(statColor), Color.green(statColor), Color.blue(statColor))); c.drawRoundRect(tempRect, barH/2, barH/2, statBarFill); }
-        float dotY = y - 3; float dotR = Math.max(1.5f, barH * 0.2f); float dotSpacing = statBarWidth / ShipData.MAX_UPGRADE_LEVEL;
+        textPaint.setTextSize(Math.min(10, sw * 0.023f)); textPaint.setFakeBoldText(true); textPaint.setColor(Color.argb((int)(160 * alpha), 180, 185, 200)); textPaint.setTextAlign(Paint.Align.LEFT); textPaint.setStyle(Paint.Style.FILL); textPaint.setShader(null); c.drawText(statName, labelX, rowY + barH + 1, textPaint);
+        tempRect.set(barX, rowY, barX + statBarWidth, rowY + barH); statBarBgPaint.setAlpha((int)(80 * alpha)); c.drawRoundRect(tempRect, barH/2, barH/2, statBarBgPaint);
+        float fillWidth = statBarWidth * Math.max(0, Math.min(1, ratio)); if (fillWidth > barH) { tempRect.set(barX, rowY, barX + fillWidth, rowY + barH); statBarFill.setColor(Color.argb((int)(200 * alpha), Color.red(statColor), Color.green(statColor), Color.blue(statColor))); c.drawRoundRect(tempRect, barH/2, barH/2, statBarFill); }
+        float dotY = rowY - 3; float dotR = Math.max(1.5f, barH * 0.2f); float dotSpacing = statBarWidth / ShipData.MAX_UPGRADE_LEVEL;
         for (int lv = 0; lv < ShipData.MAX_UPGRADE_LEVEL; lv++) { float dotX = barX + dotSpacing * (lv + 0.5f); if (lv < level) dotPaint.setColor(Color.argb((int)(220 * alpha), Color.red(statColor), Color.green(statColor), Color.blue(statColor))); else dotPaint.setColor(Color.argb((int)(40 * alpha), 150, 160, 180)); c.drawCircle(dotX, dotY, dotR, dotPaint); }
-        float ubtnY = y + (barH - upgradeBtnHeight) / 2; float upgBtnX = barX + statBarWidth + barBtnGap; float maxBtnRight = cardRight - cardWidth * 0.03f; if (upgBtnX + upgradeBtnWidth > maxBtnRight) upgBtnX = maxBtnRight - upgradeBtnWidth;
+        float ubtnY = rowY + (barH - upgradeBtnHeight) / 2;
         if (isUnlocked && level < ShipData.MAX_UPGRADE_LEVEL) {
             int cost = ship.getUpgradeCost(statIndex); boolean canAfford = economy.getCredits() >= cost;
             upgradeButtonRects[shipIndex][statIndex].set(upgBtnX, ubtnY, upgBtnX + upgradeBtnWidth, ubtnY + upgradeBtnHeight);
             int btnColor = canAfford ? Color.argb((int)(180 * alpha), 40, 140, 50) : Color.argb((int)(80 * alpha), 55, 58, 65); upgradeBtnPaint.setColor(btnColor); upgradeBtnPaint.setStyle(Paint.Style.FILL); tempRect.set(upgBtnX, ubtnY, upgBtnX + upgradeBtnWidth, ubtnY + upgradeBtnHeight); c.drawRoundRect(tempRect, upgradeBtnHeight / 2, upgradeBtnHeight / 2, upgradeBtnPaint);
             float btnTextSize = Math.max(7, Math.min(9, upgradeBtnHeight * 0.55f)); textPaint.setTextSize(btnTextSize); textPaint.setFakeBoldText(true); textPaint.setTextAlign(Paint.Align.CENTER); textPaint.setColor(canAfford ? Color.argb((int)(255 * alpha), 255, 255, 255) : Color.argb((int)(100 * alpha), 140, 145, 155)); c.drawText("+" + cost + "✦", upgBtnX + upgradeBtnWidth / 2, ubtnY + upgradeBtnHeight / 2 + btnTextSize * 0.35f, textPaint);
             if (upgradeFlashShipId == shipIndex && upgradeFlashStat == statIndex && upgradeFlashTimer > 0) { float flash = upgradeFlashTimer / 0.4f; upgradeBtnPaint.setColor(Color.argb((int)(flash * 80), 100, 255, 120)); c.drawRoundRect(tempRect, upgradeBtnHeight/2, upgradeBtnHeight/2, upgradeBtnPaint); }
-        } else if (isUnlocked && level >= ShipData.MAX_UPGRADE_LEVEL) { upgradeButtonRects[shipIndex][statIndex].setEmpty(); float maxTextSize = Math.min(8, upgradeBtnHeight * 0.5f); textPaint.setTextSize(maxTextSize); textPaint.setFakeBoldText(true); textPaint.setTextAlign(Paint.Align.CENTER); textPaint.setColor(Color.argb((int)(120 * alpha), Color.red(statColor), Color.green(statColor), Color.blue(statColor))); c.drawText("MAX", upgBtnX + upgradeBtnWidth / 2, ubtnY + upgradeBtnHeight / 2 + maxTextSize * 0.35f, textPaint); } 
-        else { upgradeButtonRects[shipIndex][statIndex].setEmpty(); float lockSize = Math.min(8, upgradeBtnHeight * 0.5f); textPaint.setTextSize(lockSize); textPaint.setTextAlign(Paint.Align.CENTER); textPaint.setColor(Color.argb((int)(50 * alpha), 120, 125, 140)); c.drawText("🔒", upgBtnX + upgradeBtnWidth / 2, ubtnY + upgradeBtnHeight / 2 + lockSize * 0.35f, textPaint); }
+        } else if (isUnlocked && level >= ShipData.MAX_UPGRADE_LEVEL) {
+            upgradeButtonRects[shipIndex][statIndex].setEmpty(); float maxTextSize = Math.min(8, upgradeBtnHeight * 0.5f); textPaint.setTextSize(maxTextSize); textPaint.setFakeBoldText(true); textPaint.setTextAlign(Paint.Align.CENTER); textPaint.setColor(Color.argb((int)(120 * alpha), Color.red(statColor), Color.green(statColor), Color.blue(statColor))); c.drawText("MAX", upgBtnX + upgradeBtnWidth / 2, ubtnY + upgradeBtnHeight / 2 + maxTextSize * 0.35f, textPaint);
+        } else {
+            upgradeButtonRects[shipIndex][statIndex].setEmpty(); float lockSize = Math.min(8, upgradeBtnHeight * 0.5f); textPaint.setTextSize(lockSize); textPaint.setTextAlign(Paint.Align.CENTER); textPaint.setColor(Color.argb((int)(50 * alpha), 120, 125, 140)); c.drawText("🔒", upgBtnX + upgradeBtnWidth / 2, ubtnY + upgradeBtnHeight / 2 + lockSize * 0.35f, textPaint);
+        }
         textPaint.setTextAlign(Paint.Align.LEFT); textPaint.setFakeBoldText(false);
     }
 
@@ -388,8 +426,19 @@ public class UIOverlay {
                     float adjY = ty + scrollY;
                     for (int i = 0; i < registry.getShipCount(); i++) {
                         ShipData ship = registry.getShip(i); float cardY = cardStartY + i * (cardHeight + cardSpacing);
-                        for (int st = 0; st < ShipData.STAT_COUNT; st++) { RectF ubr = upgradeButtonRects[i][st]; if (!ubr.isEmpty() && tx >= ubr.left && tx <= ubr.right && adjY >= ubr.top && adjY <= ubr.bottom) { if (economy.purchaseUpgrade(ship.id, st)) { economy.syncUpgradesToShipData(registry.getAllShips()); upgradeFlashShipId = i; upgradeFlashStat = st; upgradeFlashTimer = 0.4f; if(sm!=null) sm.playUpgrade(); if(vm!=null) vm.vibrateUpgrade(); } else { if(sm!=null) sm.playError(); if(vm!=null) vm.vibrateError(); } return true; } }
-                        RectF mbr = mainButtonRects[i]; if (tx >= mbr.left && tx <= mbr.right && adjY >= mbr.top && adjY <= mbr.bottom) { if (economy.isShipUnlocked(ship.id)) { economy.selectShip(ship.id); registry.selectShip(ship.id); if(sm!=null) sm.playMenuClick(); } else if (economy.purchaseShip(ship.id, ship.price)) { economy.selectShip(ship.id); registry.selectShip(ship.id); economy.syncUpgradesToShipData(registry.getAllShips()); purchaseFlashShipId = ship.id; purchaseFlashTimer = 0.8f; if(sm!=null) sm.playPurchase(); if(vm!=null) vm.vibratePurchase(); } else { if(sm!=null) sm.playError(); if(vm!=null) vm.vibrateError(); } return true; }
+                        for (int st = 0; st < ShipData.STAT_COUNT; st++) {
+                            RectF ubr = upgradeButtonRects[i][st];
+                            if (!ubr.isEmpty() && tx >= ubr.left && tx <= ubr.right && adjY >= ubr.top && adjY <= ubr.bottom) {
+                                if (economy.purchaseUpgrade(ship.id, st)) { economy.syncUpgradesToShipData(registry.getAllShips()); upgradeFlashShipId = i; upgradeFlashStat = st; upgradeFlashTimer = 0.4f; if(sm!=null) sm.playUpgrade(); if(vm!=null) vm.vibrateUpgrade(); } else { if(sm!=null) sm.playError(); if(vm!=null) vm.vibrateError(); }
+                                return true;
+                            }
+                        }
+                        RectF mbr = mainButtonRects[i];
+                        if (tx >= mbr.left && tx <= mbr.right && adjY >= mbr.top && adjY <= mbr.bottom) {
+                            if (economy.isShipUnlocked(ship.id)) { economy.selectShip(ship.id); registry.selectShip(ship.id); if(sm!=null) sm.playMenuClick(); } 
+                            else if (economy.purchaseShip(ship.id, ship.price)) { economy.selectShip(ship.id); registry.selectShip(ship.id); economy.syncUpgradesToShipData(registry.getAllShips()); purchaseFlashShipId = ship.id; purchaseFlashTimer = 0.8f; if(sm!=null) sm.playPurchase(); if(vm!=null) vm.vibratePurchase(); } else { if(sm!=null) sm.playError(); if(vm!=null) vm.vibrateError(); }
+                            return true;
+                        }
                     }
                 }
                 isDraggingShop = false; return true;
@@ -401,13 +450,10 @@ public class UIOverlay {
     public void openShop() { isShopOpen = true; scrollY = 0; }
     public void closeShop() { isShopOpen = false; }
     public boolean isShopVisible() { return isShopOpen || shopOpenAnim > 0.01f; }
-    
-    // TIKLAMA ALANI HIT CHECK KONTROLLERİ
     public boolean isPlayHit(float x, float y) { return playBtn.contains(x, y); }
     public boolean isShopHit(float x, float y) { return shopBtn.contains(x, y); }
     public boolean isSettingsHit(float x, float y) { return settingsBtn.contains(x, y); }
     public boolean isRestartHit(float x, float y) { if (gameOverTime > 0 && System.currentTimeMillis() - gameOverTime < BUTTON_DELAY) return false; return restartBtn.contains(x, y); }
-    
     public boolean isSoundEnabled() { return soundEnabled; }
     public boolean isVibrationEnabled() { return vibrationEnabled; }
 }
