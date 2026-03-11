@@ -5,6 +5,7 @@ import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.Path;
 import com.stellardrift.game.util.EconomyManager;
+import java.util.List;
 
 public class ProjectileSystem {
 
@@ -213,7 +214,7 @@ public class ProjectileSystem {
             if (!p.active) continue;
 
             for (Asteroid a : asteroids) {
-                if (a.isOffScreen(10000)) continue; // ignore offscreen check conceptually
+                if (a.isOffScreen(10000)) continue; 
                 float dx = p.x - a.getX();
                 float dy = p.y - a.getY();
                 float distSq = dx * dx + dy * dy;
