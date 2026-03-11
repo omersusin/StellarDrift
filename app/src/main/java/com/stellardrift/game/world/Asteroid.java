@@ -29,7 +29,7 @@ public class Asteroid {
     int vertexCount;
 
     int baseColor;
-    int creditValue; // Dinamik Kredi
+    int creditValue; 
 
     private int age;
     private float masterAlpha;
@@ -37,8 +37,20 @@ public class Asteroid {
     private float sinePhase, sineAmp, sineFreq;
     private float baseX;
 
+    // HATA ÇÖZÜMÜ: Craters dizisi tanımlandı
+    private float[][] craters;
+
     private RectF boundsRect;
     private Paint bodyPaint, edgePaint, craterPaint, glowPaint, highlightPaint, flashOverlayPaint;
+
+    private static final int[][] COLORS = {
+        {0xFF546E7A, 0xFF37474F, 0xFF263238},
+        {0xFF5D4037, 0xFF3E2723, 0xFF212121},
+        {0xFF455A64, 0xFF1B5E20, 0xFF1A237E},
+        {0xFF616161, 0xFF424242, 0xFF212121},
+    };
+
+    private int colorIdx;
 
     public Asteroid(int sw, int sh, float playerX) {
         float range = Constants.ASTEROID_MAX_SIZE - Constants.ASTEROID_MIN_SIZE;
@@ -62,6 +74,7 @@ public class Asteroid {
         velY = speed;
 
         rotation = 0; rotSpeed = (float)(Math.random() * 2.5 - 1.25);
+        colorIdx = (int)(Math.random() * COLORS.length);
 
         age = 0; masterAlpha = 0;
         hasSine = Math.random() < Constants.ASTEROID_SINE_CHANCE;
@@ -69,14 +82,11 @@ public class Asteroid {
         sineAmp = sw * Constants.ASTEROID_SINE_AMP * (0.5f + (float)(Math.random() * 0.5));
         sineFreq = Constants.ASTEROID_SINE_FREQ * (0.7f + (float)(Math.random() * 0.6));
 
-        // YENİ: DİNAMİK HP VE KREDİ HESAPLAMA
-        this.maxHP = Math.max(1, (int)(radius * 0.05f)); // Boyuta orantılı HP
+        this.maxHP = Math.max(1, (int)(radius * 0.05f)); 
         this.currentHP = maxHP;
 
-        // Küçük taş (az kredi), Büyük taş (çok kredi)
         this.creditValue = Math.max(3, (int)(radius * 0.15f)); 
 
-        // Renk de boyuta göre grinin tonları
         float sizeRatio = Math.min(radius / (sw * 0.08f), 1f); 
         int gray = (int)(145 - sizeRatio * 50);
         baseColor = Color.rgb(gray + 10, gray, gray - 5);
@@ -129,7 +139,7 @@ public class Asteroid {
         hitFlashTimer = HIT_FLASH_DURATION;
         if (currentHP <= 0) {
             economy.addCredits(creditValue);
-            return true; // Patladı (Destroyed)
+            return true; 
         }
         return false;
     }
