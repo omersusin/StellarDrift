@@ -36,7 +36,7 @@ public class ProjectileSystem {
         }
     }
 
-    private static final int POOL_SIZE = 60;  
+    private static final int POOL_SIZE = 80;  
     private final Projectile[] pool = new Projectile[POOL_SIZE];
     private int cursor = 0;
     private float fireTimer = 0f;
@@ -65,7 +65,6 @@ public class ProjectileSystem {
             fireTimer -= fireInterval;
             float baseSpeed = -800f * (screenHeight / 1920f) * ship.projectileSpeed; 
 
-            // DEVASA ÖLÇEK
             float scale = (screenWidth / 1080f) * 2.5f;
 
             for (int w = 0; w < ship.projectileCount; w++) {
@@ -79,8 +78,12 @@ public class ProjectileSystem {
 
                 float pw, ph;
                 switch (ship.id) {
+                    case ShipRegistry.STRIKER: pw = 2.5f * scale; ph = 8f * scale; break;
                     case ShipRegistry.JUGGERNAUT: pw = 4f * scale; ph = 10f * scale; break;
                     case ShipRegistry.PHANTOM: pw = 2f * scale; ph = 14f * scale; break;
+                    case ShipRegistry.SWARM: pw = 3.5f * scale; ph = 6f * scale; break; 
+                    case ShipRegistry.ECLIPSE: pw = 2f * scale; ph = 16f * scale; break; 
+                    case ShipRegistry.ZENITH: pw = 4f * scale; ph = 8f * scale; break; 
                     default: pw = 2.5f * scale; ph = 8f * scale; break;
                 }
 
@@ -118,6 +121,19 @@ public class ProjectileSystem {
             case ShipRegistry.PHANTOM:
                 canvas.drawRoundRect(p.x - p.width / 2, p.y - p.height / 2, p.x + p.width / 2, p.y + p.height / 2, p.width / 2, p.width / 2, projPaint);
                 projPaint.setColor(Color.argb(40, Color.red(p.color), Color.green(p.color), Color.blue(p.color))); canvas.drawCircle(p.x, p.y, p.height * 0.4f, projPaint);
+                break;
+            case ShipRegistry.SWARM:
+                canvas.drawCircle(p.x, p.y, p.width * 0.7f, projPaint);
+                projPaint.setColor(Color.argb(230, 220, 255, 200)); canvas.drawCircle(p.x, p.y, p.width * 0.3f, projPaint);
+                break;
+            case ShipRegistry.ECLIPSE:
+                projPath.reset(); projPath.moveTo(p.x, p.y - p.height / 2); projPath.lineTo(p.x + p.width * 0.4f, p.y - p.height * 0.15f); projPath.lineTo(p.x + p.width * 0.3f, p.y + p.height * 0.3f); projPath.lineTo(p.x, p.y + p.height / 2); projPath.lineTo(p.x - p.width * 0.3f, p.y + p.height * 0.3f); projPath.lineTo(p.x - p.width * 0.4f, p.y - p.height * 0.15f); projPath.close();
+                canvas.drawPath(projPath, projPaint); projPaint.setColor(Color.argb(30, 255, 40, 20)); canvas.drawCircle(p.x, p.y, p.height * 0.5f, projPaint);
+                break;
+            case ShipRegistry.ZENITH:
+                projPaint.setColor(Color.argb(35, Color.red(p.color), Color.green(p.color), Color.blue(p.color))); canvas.drawCircle(p.x, p.y, p.width * 1.8f, projPaint);
+                projPaint.setColor(Color.argb(80, Color.red(p.color), Color.green(p.color), Color.blue(p.color))); canvas.drawCircle(p.x, p.y, p.width, projPaint);
+                projPaint.setColor(Color.argb(230, 255, 250, 220)); canvas.drawCircle(p.x, p.y, p.width * 0.5f, projPaint);
                 break;
         }
     }

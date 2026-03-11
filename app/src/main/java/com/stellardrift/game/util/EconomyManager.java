@@ -2,34 +2,27 @@ package com.stellardrift.game.util;
 
 import android.content.Context;
 import android.content.SharedPreferences;
+import com.stellardrift.game.world.ShipRegistry;
 
 public class EconomyManager {
-
     private final SharedPreferences prefs;
     private int totalCredits;
     private final boolean[] unlockedShips;
     private int selectedShipId;
-
     private float displayedCredits;
     private float creditFlashTimer = 0f;
 
     public EconomyManager(Context context) {
-        prefs = context.getSharedPreferences(Constants.PREFS_NAME, Context.MODE_PRIVATE);
+        prefs = context.getSharedPreferences("stellar_drift_save", Context.MODE_PRIVATE);
         totalCredits = prefs.getInt("credits", 0);
         selectedShipId = prefs.getInt("selected_ship", 0);
 
-        unlockedShips = new boolean[3];
+        unlockedShips = new boolean[ShipRegistry.SHIP_COUNT];
         unlockedShips[0] = true; 
-        unlockedShips[1] = prefs.getBoolean("ship_1_unlocked", false);
-        unlockedShips[2] = prefs.getBoolean("ship_2_unlocked", false);
-
+        for (int i = 1; i < ShipRegistry.SHIP_COUNT; i++) {
+            unlockedShips[i] = prefs.getBoolean("ship_" + i + "_unlocked", false);
+        }
         displayedCredits = totalCredits;
-    }
-
-    public void addCredits(int amount) {
-        totalCredits += amount;
-        creditFlashTimer = 0.3f; 
-        saveAll();
     }
 
     public boolean purchaseShip(int shipId, int price) {
@@ -43,18 +36,25 @@ public class EconomyManager {
     }
 
     public void saveAll() {
-        prefs.edit()
-            .putInt("credits", totalCredits)
-            .putInt("selected_ship", selectedShipId)
-            .putBoolean("ship_1_unlocked", unlockedShips[1])
-            .putBoolean("ship_2_unlocked", unlockedShips[2])
-            .apply();
+        SharedPreferences.Editor ed = prefs.edit();
+        ed.putInt("credits", totalCredits);
+        ed.putInt("selected_ship", selectedShipId);
+        for (int i = 1; i < ShipRegistry.SHIP_COUNT; i++) {
+            ed.putBoolean("ship_" + i + "_unlocked", unlockedShips[i]);
+        }
+        ed.apply();
     }
 
-    public void convertSessionScore(int sessionScore) {
-        int earned = sessionScore / 10; 
+    public void addCredits(int amount) {
+        totalCredits += amount;
+        creditFlashTimer = 0.3f;
+    }
+
+    public void convertSessionScore(int score) {
+        int earned = score / 10;
         if (earned > 0) {
             addCredits(earned);
+            saveAll();
         }
     }
 
@@ -67,14 +67,13 @@ public class EconomyManager {
         } else {
             displayedCredits = totalCredits;
         }
-
         if (creditFlashTimer > 0) creditFlashTimer -= dt;
     }
 
-    public int getCredits()                { return totalCredits; }
-    public int getDisplayedCredits()       { return (int) displayedCredits; }
-    public float getCreditFlash()          { return Math.max(0, creditFlashTimer); }
-    public boolean isShipUnlocked(int id)  { return unlockedShips[id]; }
-    public int getSelectedShipId()         { return selectedShipId; }
-    public void selectShip(int id)         { selectedShipId = id; saveAll(); }
+    public int getCredits()               { return totalCredits; }
+    public int getDisplayedCredits()      { return (int) displayedCredits; }
+    public float getCreditFlash()         { return Math.max(0, creditFlashTimer); }
+    public boolean isShipUnlocked(int id) { return unlockedShips[id]; }
+    public int getSelectedShipId()        { return selectedShipId; }
+    public void selectShip(int id)        { selectedShipId = id; saveAll(); }
 }

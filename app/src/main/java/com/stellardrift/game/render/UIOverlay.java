@@ -20,31 +20,36 @@ import com.stellardrift.game.world.ShipRegistry;
 
 public class UIOverlay {
 
+    public static final int STATE_MAIN_MENU = 1;
+    public static final int STATE_PLAYING = 2;
+    public static final int STATE_GAME_OVER = 3;
+    public static final int STATE_SETTINGS = 4;
+    public static final int STATE_SHOP = 5;
+
+    private int currentState = STATE_MAIN_MENU;
+
     private int sw, sh;
+    
+    // Gelişmiş, izole Paint objeleri (State Leak engellemek için)
     private Paint titlePaint, subtitlePaint, scorePaint, smallPaint;
-    private Paint btnPaint, btnTextPaint, btnOutlinePaint;
-    private Paint dimPaint, accentPaint, labelPaint, valuePaint;
+    private Paint cardPaint, cardBorderPaint, btnTextPaint;
+    private Paint dimPaint, labelPaint, valuePaint;
     private Paint hudScorePaint, hudLabelPaint, diffBarBg, diffBarFill;
     private Paint comboPaint, powerBarBg, powerBarFill, statPaint;
     private Paint milestonePaint, tempoPaint, riskPaint;
     private Paint highScoreLinePaint, highScoreTextPaint;
-
-    // X Kapatma Butonu Paint'leri
     private Paint closeBtnCirclePaint, closeBtnXPaint;
-    private static final float CLOSE_BTN_HITBOX = 50f; 
-
-    // Settings Ekranı Alanları
-    private RectF[] settingsToggleRects = new RectF[6];
-    private RectF soundToggleRect = new RectF();
-    private RectF vibToggleRect = new RectF();
     private Paint toggleBgPaint, toggleActivePaint, toggleTextPaint, dividerPaint;
 
-    private RectF playBtn, settingsBtn, shopBtn;
+    private RectF playBtn, settingsBtn, shopBtn, backBtn;
+    private RectF diffBtn, speedBtn, soundBtn, vibBtn;
     private RectF restartBtn;
+    private RectF[] settingsToggleRects = new RectF[6];
+    private RectF soundToggleRect = new RectF(), vibToggleRect = new RectF();
+
     private float pulse;
     private long gameOverTime;
     private static final long BUTTON_DELAY = 1200;
-
     private boolean recordBroken = false;
     private float recordBreakParticleTimer = 0;
 
@@ -62,7 +67,16 @@ public class UIOverlay {
     
     private float cardWidth, cardHeight, cardSpacing, cardStartY, totalContentHeight;
     private RectF tempRect = new RectF();
+    private RectF tempBtnRect = new RectF();
     private Paint shopBgPaint = new Paint(), statBarBgPaint = new Paint(), statBarPaint = new Paint();
+
+    private int difficultyLevel = 1, gameSpeedLevel = 1;
+    private boolean soundEnabled = true, vibrationEnabled = true;
+    private int soundToggleCount = 0, vibrationToggleCount = 0;
+    private boolean godModeActive = false;
+
+    private FuelSystem fuelSystem;
+    private SettingsManager settingsManager;
 
     public UIOverlay(int sw, int sh) {
         this.sw = sw; this.sh = sh; pulse = 0; gameOverTime = 0;
@@ -71,11 +85,12 @@ public class UIOverlay {
         subtitlePaint = makePaint(WHITE, sw * 0.04f, Paint.Align.CENTER, false); subtitlePaint.setAlpha(180);
         scorePaint = makePaint(WHITE, sw * 0.08f, Paint.Align.CENTER, true);
         smallPaint = makePaint(0xFFB0BEC5, sw * 0.035f, Paint.Align.CENTER, false);
-        btnPaint = new Paint(Paint.ANTI_ALIAS_FLAG); btnPaint.setStyle(Paint.Style.FILL); btnPaint.setColor(0x33FFFFFF);
-        btnOutlinePaint = new Paint(Paint.ANTI_ALIAS_FLAG); btnOutlinePaint.setStyle(Paint.Style.STROKE); btnOutlinePaint.setStrokeWidth(3f); btnOutlinePaint.setColor(CYAN); btnOutlinePaint.setAlpha(120);
+        
+        cardPaint = new Paint(Paint.ANTI_ALIAS_FLAG); cardPaint.setStyle(Paint.Style.FILL);
+        cardBorderPaint = new Paint(Paint.ANTI_ALIAS_FLAG); cardBorderPaint.setStyle(Paint.Style.STROKE);
         btnTextPaint = makePaint(WHITE, sw * 0.045f, Paint.Align.CENTER, true);
+        
         dimPaint = new Paint(); dimPaint.setColor(DIM); dimPaint.setStyle(Paint.Style.FILL);
-        accentPaint = makePaint(CYAN, sw * 0.06f, Paint.Align.CENTER, true);
         labelPaint = makePaint(0xFFB0BEC5, sw * 0.04f, Paint.Align.LEFT, false);
         valuePaint = makePaint(WHITE, sw * 0.04f, Paint.Align.RIGHT, true);
         hudScorePaint = makePaint(WHITE, sw * 0.06f, Paint.Align.LEFT, true);
@@ -92,11 +107,9 @@ public class UIOverlay {
         highScoreLinePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
         highScoreTextPaint = makePaint(GOLD, sw * 0.03f, Paint.Align.RIGHT, true);
 
-        // Kapatma Butonu (X) Boyaları
         closeBtnCirclePaint = new Paint(Paint.ANTI_ALIAS_FLAG); closeBtnCirclePaint.setStyle(Paint.Style.FILL);
         closeBtnXPaint = new Paint(Paint.ANTI_ALIAS_FLAG); closeBtnXPaint.setStyle(Paint.Style.STROKE); closeBtnXPaint.setStrokeCap(Paint.Cap.ROUND);
 
-        // Ayarlar Toggle Boyaları
         toggleBgPaint = new Paint(Paint.ANTI_ALIAS_FLAG); toggleBgPaint.setStyle(Paint.Style.FILL);
         toggleActivePaint = new Paint(Paint.ANTI_ALIAS_FLAG); toggleActivePaint.setStyle(Paint.Style.FILL);
         toggleTextPaint = makePaint(WHITE, sw * 0.03f, Paint.Align.CENTER, true);
@@ -116,6 +129,16 @@ public class UIOverlay {
         statBarPaint.setStyle(Paint.Style.FILL);
         
         cardWidth = sw * 0.88f; cardHeight = sh * 0.22f; cardSpacing = sh * 0.03f; cardStartY = sh * 0.15f;
+    }
+
+    public void setFuelSystem(FuelSystem fs) { this.fuelSystem = fs; }
+
+    public void initPrefs(SettingsManager settings) {
+        this.settingsManager = settings;
+        difficultyLevel = settings.getDifficulty();
+        gameSpeedLevel = settings.getGameSpeed();
+        soundEnabled = settings.isSoundEnabled();
+        vibrationEnabled = settings.isVibrationEnabled();
     }
 
     private Paint makePaint(int color, float size, Paint.Align align, boolean bold) {
@@ -142,7 +165,7 @@ public class UIOverlay {
         } else if (world.getState() == Constants.STATE_GAME_OVER) {
             drawGameOver(c, world);
         } else if (world.getState() == Constants.STATE_SETTINGS) {
-            drawSettingsScreen(c, world.getSettings(), world.isGodModeActive());
+            drawSettingsScreen(c, world.isGodModeActive());
         }
 
         if (shopOpenAnim > 0.01f) drawShop(c, world.getShipRegistry(), world.getEconomy(), shipRenderer);
@@ -155,79 +178,95 @@ public class UIOverlay {
         titlePaint.setTextSize(sw * 0.14f * p); c.drawText("DRIFT", cx, sh * 0.26f, titlePaint); titlePaint.setShader(null);
         if (highScore > 0) { smallPaint.setTextSize(sw * 0.035f); smallPaint.setAlpha(180); c.drawText("★ BEST: " + highScore, cx, sh * 0.33f, smallPaint); }
         
-        drawButton(c, playBtn, "▶ PLAY", CYAN); 
-        drawButton(c, shopBtn, "✦ SHOP", GOLD); 
-        drawButton(c, settingsBtn, "⚙ SETTINGS", PURPLE);
+        // DRAW BUTTONLAR (State Leak Engellenmiş Hali)
+        drawMenuButton(c, playBtn, "▶ PLAY", Color.argb(180, 25, 30, 45), Color.argb(140, 100, 180, 255));
+        drawMenuButton(c, shopBtn, "✦ SHOP", Color.argb(180, 30, 28, 40), Color.argb(140, 200, 170, 40));
+        drawMenuButton(c, settingsBtn, "⚙ SETTINGS", Color.argb(180, 25, 28, 40), Color.argb(140, 120, 130, 160));
         
         subtitlePaint.setTextSize(sw * 0.035f); subtitlePaint.setAlpha((int)(150 * (Math.sin(pulse * 1.5) * 0.3 + 0.7))); 
         c.drawText("Destroy asteroids & upgrade ship!", cx, sh * 0.88f, subtitlePaint);
-        smallPaint.setTextSize(sw * 0.025f); smallPaint.setAlpha(80); c.drawText("v4.1 Fuel Update", cx, sh * 0.95f, smallPaint);
+        smallPaint.setTextSize(sw * 0.025f); smallPaint.setAlpha(80); c.drawText("v4.5 Mega Fleet", cx, sh * 0.95f, smallPaint);
     }
 
-    // ==========================================
-    // AYARLAR EKRANI (SETTINGS) - YENİDEN ÇİZİLDİ
-    // ==========================================
-    private void drawSettingsScreen(Canvas c, SettingsManager s, boolean godMode) {
-        c.drawRect(0, 0, sw, sh, dimPaint); // Overlay karartma
+    private void drawMenuButton(Canvas c, RectF rect, String text, int bgColor, int outlineColor) {
+        cardPaint.setColor(bgColor);
+        cardPaint.setStyle(Paint.Style.FILL);
+        c.drawRoundRect(rect, 25, 25, cardPaint);
+
+        cardBorderPaint.setColor(outlineColor);
+        cardBorderPaint.setStyle(Paint.Style.STROKE);
+        cardBorderPaint.setStrokeWidth(3f);
+        c.drawRoundRect(rect, 25, 25, cardBorderPaint);
+
+        btnTextPaint.setColor(WHITE);
+        c.drawText(text, rect.centerX(), rect.centerY() + sw * 0.015f, btnTextPaint);
+    }
+
+    private void drawSettingsScreen(Canvas c, boolean godMode) {
+        c.drawRect(0, 0, sw, sh, dimPaint);
 
         float cw = sw * 0.9f; float ch = sh * 0.6f;
         float cx = sw * 0.05f; float cy = sh * 0.2f;
 
-        // Kart Arka Plan
         tempRect.set(cx, cy, cx + cw, cy + ch);
-        btnPaint.setColor(Color.argb(220, 18, 22, 35)); c.drawRoundRect(tempRect, 30, 30, btnPaint);
-        btnOutlinePaint.setColor(Color.argb(80, 100, 120, 180)); btnOutlinePaint.setStrokeWidth(3f); c.drawRoundRect(tempRect, 30, 30, btnOutlinePaint);
+        cardPaint.setColor(Color.argb(220, 18, 22, 35)); cardPaint.setStyle(Paint.Style.FILL);
+        c.drawRoundRect(tempRect, 30, 30, cardPaint);
+        cardBorderPaint.setColor(Color.argb(80, 100, 120, 180)); cardBorderPaint.setStyle(Paint.Style.STROKE);
+        c.drawRoundRect(tempRect, 30, 30, cardBorderPaint);
 
-        // Başlık
-        accentPaint.setColor(WHITE); accentPaint.setTextSize(sw * 0.07f);
-        c.drawText("⚙ SETTINGS", sw / 2f, cy + sh * 0.07f, accentPaint);
+        titlePaint.setColor(WHITE); titlePaint.setTextSize(sw * 0.07f); titlePaint.setShader(null);
+        c.drawText("⚙ SETTINGS", sw / 2f, cy + sh * 0.07f, titlePaint);
         c.drawLine(cx + 40, cy + sh * 0.09f, cx + cw - 40, cy + sh * 0.09f, dividerPaint);
 
         float rowY = cy + sh * 0.15f; float rowGap = sh * 0.09f;
 
-        // DIFFICULTY
-        labelPaint.setColor(Color.rgb(190, 195, 210)); c.drawText("DIFFICULTY", cx + 40, rowY, labelPaint);
-        drawThreeWayToggle(c, cx + cw - sw*0.45f, rowY - sh*0.03f, sw*0.4f, sh*0.05f, s.getDifficulty(), new String[]{"EASY", "NORM", "HARD"}, new int[]{Color.rgb(60, 180, 80), Color.rgb(60, 140, 220), Color.rgb(220, 60, 50)}, 0);
+        drawSettingsLabel(c, "DIFFICULTY", cx + 40, rowY);
+        drawThreeWayToggle(c, cx + cw - sw*0.45f, rowY - sh*0.03f, sw*0.4f, sh*0.05f, difficultyLevel, new String[]{"EASY", "NORM", "HARD"}, new int[]{Color.rgb(60, 180, 80), Color.rgb(60, 140, 220), Color.rgb(220, 60, 50)}, 0);
         c.drawLine(cx + 40, rowY + sh*0.04f, cx + cw - 40, rowY + sh*0.04f, dividerPaint);
 
-        // GAME SPEED
         rowY += rowGap;
-        c.drawText("GAME SPEED", cx + 40, rowY, labelPaint);
-        drawThreeWayToggle(c, cx + cw - sw*0.45f, rowY - sh*0.03f, sw*0.4f, sh*0.05f, s.getGameSpeed(), new String[]{"SLOW", "NORM", "FAST"}, new int[]{Color.rgb(100, 160, 200), Color.rgb(60, 140, 220), Color.rgb(240, 160, 30)}, 1);
+        drawSettingsLabel(c, "GAME SPEED", cx + 40, rowY);
+        drawThreeWayToggle(c, cx + cw - sw*0.45f, rowY - sh*0.03f, sw*0.4f, sh*0.05f, gameSpeedLevel, new String[]{"SLOW", "NORM", "FAST"}, new int[]{Color.rgb(100, 160, 200), Color.rgb(60, 140, 220), Color.rgb(240, 160, 30)}, 1);
         c.drawLine(cx + 40, rowY + sh*0.04f, cx + cw - 40, rowY + sh*0.04f, dividerPaint);
 
-        // SOUND
         rowY += rowGap;
-        c.drawText("SOUND", cx + 40, rowY, labelPaint);
-        drawOnOffToggle(c, cx + cw - sw*0.25f, rowY - sh*0.03f, sw*0.2f, sh*0.045f, s.isSoundEnabled(), soundToggleRect);
+        drawSettingsLabel(c, "SOUND", cx + 40, rowY);
+        drawOnOffToggle(c, cx + cw - sw*0.25f, rowY - sh*0.03f, sw*0.2f, sh*0.045f, soundEnabled, soundToggleRect);
         c.drawLine(cx + 40, rowY + sh*0.04f, cx + cw - 40, rowY + sh*0.04f, dividerPaint);
 
-        // VIBRATION
         rowY += rowGap;
-        c.drawText("VIBRATION", cx + 40, rowY, labelPaint);
-        drawOnOffToggle(c, cx + cw - sw*0.25f, rowY - sh*0.03f, sw*0.2f, sh*0.045f, s.isVibrationEnabled(), vibToggleRect);
+        drawSettingsLabel(c, "VIBRATION", cx + 40, rowY);
+        drawOnOffToggle(c, cx + cw - sw*0.25f, rowY - sh*0.03f, sw*0.2f, sh*0.045f, vibrationEnabled, vibToggleRect);
+        c.drawLine(cx + 40, rowY + sh*0.04f, cx + cw - 40, rowY + sh*0.04f, dividerPaint);
+
+        rowY += rowGap;
+        drawSettingsLabel(c, "FUEL DRAIN", cx + 40, rowY);
+        smallPaint.setColor(Color.rgb(200, 180, 60)); smallPaint.setTextAlign(Paint.Align.RIGHT);
+        c.drawText("3.5/sec", cx + cw - 40, rowY, smallPaint); smallPaint.setTextAlign(Paint.Align.CENTER);
 
         if (godMode) {
             smallPaint.setColor(GOLD); smallPaint.setTextSize(sw * 0.035f);
             c.drawText("★ GOD MODE ACTIVE ★", sw / 2f, cy + ch - 40, smallPaint);
         }
 
-        drawCloseButton(c);
+        drawCloseButton(c, sw - sw * 0.1f, sh * 0.08f);
+    }
+
+    private void drawSettingsLabel(Canvas c, String label, float x, float y) {
+        labelPaint.setColor(Color.rgb(190, 195, 210)); labelPaint.setTextSize(sw * 0.04f); labelPaint.setFakeBoldText(true);
+        c.drawText(label, x, y, labelPaint);
     }
 
     private void drawThreeWayToggle(Canvas c, float x, float y, float w, float h, int selIdx, String[] labels, int[] colors, int groupIdx) {
         float segW = w / 3f;
         for (int i = 0; i < 3; i++) {
             float sx = x + segW * i;
-            RectF r = settingsToggleRects[groupIdx * 3 + i];
-            r.set(sx, y, sx + segW, y + h);
-
+            RectF r = settingsToggleRects[groupIdx * 3 + i]; r.set(sx, y, sx + segW, y + h);
             if (i == selIdx) {
                 toggleActivePaint.setColor(Color.argb(200, Color.red(colors[i]), Color.green(colors[i]), Color.blue(colors[i])));
                 c.drawRoundRect(r, 12, 12, toggleActivePaint);
             } else {
-                toggleBgPaint.setColor(Color.argb(80, 40, 45, 60));
-                c.drawRoundRect(r, 12, 12, toggleBgPaint);
+                toggleBgPaint.setColor(Color.argb(80, 40, 45, 60)); c.drawRoundRect(r, 12, 12, toggleBgPaint);
             }
             toggleTextPaint.setColor(i == selIdx ? WHITE : Color.rgb(130, 135, 150));
             c.drawText(labels[i], sx + segW / 2, y + h * 0.65f, toggleTextPaint);
@@ -238,23 +277,20 @@ public class UIOverlay {
         hitRect.set(x, y, x + w, y + h);
         if (isOn) {
             toggleActivePaint.setColor(Color.argb(200, 60, 180, 80)); c.drawRoundRect(hitRect, h/2, h/2, toggleActivePaint);
-            btnPaint.setColor(WHITE); c.drawCircle(x + w - h/2, y + h/2, h/2 - 4, btnPaint);
+            cardPaint.setColor(WHITE); c.drawCircle(x + w - h/2, y + h/2, h/2 - 4, cardPaint);
             toggleTextPaint.setColor(WHITE); c.drawText("ON", x + w * 0.35f, y + h * 0.65f, toggleTextPaint);
         } else {
             toggleBgPaint.setColor(Color.argb(150, 60, 60, 70)); c.drawRoundRect(hitRect, h/2, h/2, toggleBgPaint);
-            btnPaint.setColor(Color.rgb(140, 140, 150)); c.drawCircle(x + h/2, y + h/2, h/2 - 4, btnPaint);
+            cardPaint.setColor(Color.rgb(140, 140, 150)); c.drawCircle(x + h/2, y + h/2, h/2 - 4, cardPaint);
             toggleTextPaint.setColor(Color.rgb(100, 100, 110)); c.drawText("OFF", x + w * 0.65f, y + h * 0.65f, toggleTextPaint);
         }
     }
 
-    // ==========================================
-    // X KAPATMA BUTONU
-    // ==========================================
-    private void drawCloseButton(Canvas c) {
-        float cx = sw - sw * 0.1f, cy = sh * 0.08f, rad = sw * 0.05f, cross = rad * 0.4f;
+    private void drawCloseButton(Canvas c, float cx, float cy) {
         closeBtnCirclePaint.setColor(Color.argb(180, 200, 50, 50));
-        c.drawCircle(cx, cy, rad, closeBtnCirclePaint);
+        c.drawCircle(cx, cy, sw * 0.05f, closeBtnCirclePaint);
         closeBtnXPaint.setColor(WHITE); closeBtnXPaint.setStrokeWidth(5f);
+        float cross = sw * 0.02f;
         c.drawLine(cx - cross, cy - cross, cx + cross, cy + cross, closeBtnXPaint);
         c.drawLine(cx + cross, cy - cross, cx - cross, cy + cross, closeBtnXPaint);
     }
@@ -264,48 +300,6 @@ public class UIOverlay {
         return (Math.pow(tx - cx, 2) + Math.pow(ty - cy, 2)) < Math.pow(CLOSE_BTN_HITBOX, 2);
     }
 
-    // ==========================================
-    // DOKUNMA YÖNETİMİ
-    // ==========================================
-    public boolean handleSettingsTouch(float tx, float ty, GameWorld world) {
-        if (isCloseHit(tx, ty)) { world.quitToMenu(); return true; }
-        SettingsManager s = world.getSettings();
-
-        for (int i = 0; i < 3; i++) { if (settingsToggleRects[i].contains(tx, ty)) { s.cycleDifficulty(); return true; } }
-        for (int i = 0; i < 3; i++) { if (settingsToggleRects[3+i].contains(tx, ty)) { s.cycleGameSpeed(); return true; } }
-
-        if (soundToggleRect.contains(tx, ty)) { world.toggleSound(); return true; }
-        if (vibToggleRect.contains(tx, ty)) { world.toggleVibration(); return true; }
-
-        return false;
-    }
-
-    public boolean handleShopTouch(int action, float tx, float ty, ShipRegistry registry, EconomyManager economy) {
-        if (!isShopOpen && shopOpenAnim < 0.01f) return false;
-        switch (action) {
-            case MotionEvent.ACTION_DOWN: touchDownY = (int) ty; lastTouchY = (int) ty; isDraggingShop = false; return true;
-            case MotionEvent.ACTION_MOVE: int dy = lastTouchY - (int) ty; if (Math.abs((int) ty - touchDownY) > 15) isDraggingShop = true; if (isDraggingShop) scrollY = Math.max(0, Math.min(totalContentHeight - sh, scrollY + dy)); lastTouchY = (int) ty; return true;
-            case MotionEvent.ACTION_UP:
-                if (!isDraggingShop) {
-                    if (isCloseHit(tx, ty)) { closeShop(); return true; }
-                    float adjY = ty + scrollY;
-                    for (int i = 0; i < registry.getShipCount(); i++) {
-                        ShipData ship = registry.getShip(i); float cardY = cardStartY + i * (cardHeight + cardSpacing); float cx = (sw - cardWidth) / 2;
-                        float btnW = sw * 0.35f, btnH = sh * 0.05f, btnX = cx + cardWidth - btnW - sw * 0.04f, btnY = cardY + cardHeight - btnH - sh * 0.02f;
-                        if (tx >= btnX && tx <= btnX + btnW && adjY >= btnY && adjY <= btnY + btnH) {
-                            if (economy.isShipUnlocked(ship.id)) { economy.selectShip(ship.id); registry.selectShip(ship.id); } 
-                            else if (economy.purchaseShip(ship.id, ship.price)) { economy.selectShip(ship.id); registry.selectShip(ship.id); }
-                            return true;
-                        }
-                    }
-                }
-                isDraggingShop = false; return true;
-        } return true;
-    }
-
-    // ==========================================
-    // SHOP DRAWING
-    // ==========================================
     private void drawShop(Canvas c, ShipRegistry registry, EconomyManager economy, ShipRenderer renderer) {
         float alpha = shopOpenAnim;
         shopBgPaint.setAlpha((int)(240 * alpha)); c.drawRect(0, 0, sw, sh, shopBgPaint);
@@ -323,7 +317,7 @@ public class UIOverlay {
         }
         c.restore();
 
-        drawCloseButton(c);
+        drawCloseButton(c, sw - sw * 0.1f, sh * 0.08f);
         drawCreditDisplay(c, economy, alpha);
     }
 
@@ -333,15 +327,15 @@ public class UIOverlay {
         boolean isUnlocked = economy.isShipUnlocked(ship.id);
 
         tempRect.set(cx, cardY, cx + cardWidth, cardY + cardHeight);
-        btnPaint.setColor(isSelected ? Color.argb((int)(200 * alpha), 20, 40, 30) : Color.argb((int)(200 * alpha), 25, 25, 35));
-        c.drawRoundRect(tempRect, 24, 24, btnPaint);
+        cardPaint.setColor(isSelected ? Color.argb((int)(200 * alpha), 20, 40, 30) : Color.argb((int)(200 * alpha), 25, 25, 35));
+        c.drawRoundRect(tempRect, 24, 24, cardPaint);
 
-        btnOutlinePaint.setColor(isSelected ? Color.argb((int)(255 * alpha), 100, 255, 150) : Color.argb((int)(80 * alpha), 100, 150, 200));
-        btnOutlinePaint.setStrokeWidth(isSelected ? 5f : 2f);
-        c.drawRoundRect(tempRect, 24, 24, btnOutlinePaint);
+        cardBorderPaint.setColor(isSelected ? Color.argb((int)(255 * alpha), 100, 255, 150) : Color.argb((int)(80 * alpha), 100, 150, 200));
+        cardBorderPaint.setStrokeWidth(isSelected ? 5f : 2f);
+        c.drawRoundRect(tempRect, 24, 24, cardBorderPaint);
 
         float previewX = cx + sw * 0.18f, previewY = cardY + cardHeight / 2;
-        btnPaint.setColor(Color.argb((int)(50 * alpha), 80, 100, 150)); c.drawCircle(previewX, previewY, sw * 0.13f, btnPaint);
+        cardPaint.setColor(Color.argb((int)(50 * alpha), 80, 100, 150)); c.drawCircle(previewX, previewY, sw * 0.13f, cardPaint);
         renderer.drawShip(c, ship, previewX, previewY, 0f, (int)(255 * alpha), (sw/1080f) * 2.2f, false);
 
         float infoX = cx + sw * 0.38f;
@@ -362,14 +356,14 @@ public class UIOverlay {
 
         btnTextPaint.setTextSize(btnH * 0.4f);
         if (isSelected) {
-            btnPaint.setColor(Color.argb((int)(180 * alpha), 40, 160, 80)); c.drawRoundRect(tempRect, btnH/2, btnH/2, btnPaint);
+            cardPaint.setColor(Color.argb((int)(180 * alpha), 40, 160, 80)); c.drawRoundRect(tempRect, btnH/2, btnH/2, cardPaint);
             btnTextPaint.setColor(Color.argb((int)(255 * alpha), 255, 255, 255)); c.drawText("✓ EQUIPPED", btnX + btnW/2, btnY + btnH*0.65f, btnTextPaint);
         } else if (isUnlocked) {
-            btnPaint.setColor(Color.argb((int)(180 * alpha), 60, 120, 180)); c.drawRoundRect(tempRect, btnH/2, btnH/2, btnPaint);
+            cardPaint.setColor(Color.argb((int)(180 * alpha), 60, 120, 180)); c.drawRoundRect(tempRect, btnH/2, btnH/2, cardPaint);
             btnTextPaint.setColor(Color.argb((int)(255 * alpha), 255, 255, 255)); c.drawText("EQUIP", btnX + btnW/2, btnY + btnH*0.65f, btnTextPaint);
         } else {
-            btnPaint.setColor(economy.getCredits() >= ship.price ? Color.argb((int)(200 * alpha), 200, 160, 30) : Color.argb((int)(100 * alpha), 80, 80, 80));
-            c.drawRoundRect(tempRect, btnH/2, btnH/2, btnPaint);
+            cardPaint.setColor(economy.getCredits() >= ship.price ? Color.argb((int)(200 * alpha), 200, 160, 30) : Color.argb((int)(100 * alpha), 80, 80, 80));
+            c.drawRoundRect(tempRect, btnH/2, btnH/2, cardPaint);
             btnTextPaint.setColor(Color.argb((int)(255 * alpha), 255, 255, 255)); c.drawText("🔒 " + ship.price + " ✦", btnX + btnW/2, btnY + btnH*0.65f, btnTextPaint);
         }
     }
@@ -401,8 +395,7 @@ public class UIOverlay {
         hudLabelPaint.setAlpha(150); hudLabelPaint.setTextAlign(Paint.Align.LEFT); c.drawText("SCORE", pad, sh * 0.04f, hudLabelPaint);
         hudScorePaint.setColor(WHITE); c.drawText(String.valueOf(world.getScore()), pad, sh * 0.075f, hudScorePaint);
         
-        // FUEL BAR DRAWING (World'den al)
-        if (world.getFuelSystem() != null) world.getFuelSystem().draw(c);
+        if (fuelSystem != null) fuelSystem.draw(c);
 
         int tempo = world.getTempoPhase();
         if (tempo != Constants.TEMPO_CALM) {
@@ -411,11 +404,7 @@ public class UIOverlay {
             tempoPaint.setColor(tc); tempoPaint.setAlpha(180); tempoPaint.setTextAlign(Paint.Align.RIGHT);
             c.drawText(tl, sw - pad, sh * 0.095f, tempoPaint);
         }
-
-        if (world.isRiskWindowActive()) {
-            riskPaint.setAlpha((int)(220 * (Math.sin(pulse * 5) * 0.15 + 0.85))); c.drawText("⚡ RISK x1.5 ⚡", sw / 2f, sh * 0.16f, riskPaint);
-        }
-
+        if (world.isRiskWindowActive()) { riskPaint.setAlpha((int)(220 * (Math.sin(pulse * 5) * 0.15 + 0.85))); c.drawText("⚡ RISK x1.5 ⚡", sw / 2f, sh * 0.16f, riskPaint); }
         float pbY = sh * 0.92f, pbH = sh * 0.012f, pbW = sw * 0.25f; int pbc = 0;
         if (world.isMagnetActive()) { drawPowerBar(c, pad, pbY - pbc*(pbH+8), pbW, pbH, "MAGNET", world.getMagnetTimer(), Constants.POWERUP_DURATION, PowerUp.getColor(Constants.POWERUP_MAGNET)); pbc++; }
         if (world.isSlowmoActive()) { drawPowerBar(c, pad, pbY - pbc*(pbH+8), pbW, pbH, "SLOW-MO", world.getSlowmoTimer(), Constants.POWERUP_DURATION, PowerUp.getColor(Constants.POWERUP_SLOWMO)); pbc++; }
@@ -428,23 +417,91 @@ public class UIOverlay {
         float f = (float) timer / max; powerBarFill.setColor(color); powerBarFill.setAlpha(f < 0.25f ? (int)(200 * (Math.sin(pulse * 8) * 0.3 + 0.7)) : 200); c.drawRoundRect(new RectF(x, y, x + w * f, y + h), h, h, powerBarFill);
     }
 
-    private void drawMilestone(Canvas c, GameWorld world) { /* Orijinalle ayni */ }
-    private void drawHighScoreProximity(Canvas c, GameWorld world) { /* Orijinalle ayni */ }
-    private void drawGameOver(Canvas c, GameWorld world) { /* Orijinalle ayni */ }
-    private void drawStats(Canvas c, GameWorld w, float a) { /* Orijinalle ayni */ }
+    public boolean handleTouch(int action, float tx, float ty, GameWorld world) {
+        if (action != MotionEvent.ACTION_UP) return false;
+        if (currentState == STATE_MAIN_MENU) {
+            if (playBtn.contains(tx, ty)) { currentState = STATE_PLAYING; world.startGame(); return true; }
+            if (shopBtn.contains(tx, ty)) { currentState = STATE_SHOP; openShop(); return true; }
+            if (settingsBtn.contains(tx, ty)) { currentState = STATE_SETTINGS; return true; }
+        } else if (currentState == STATE_SETTINGS) {
+            if (isCloseHit(tx, ty)) { currentState = STATE_MAIN_MENU; return true; }
+            for (int i = 0; i < 3; i++) if (settingsToggleRects[i].contains(tx, ty)) { difficultyLevel = i; saveSettings(); return true; }
+            for (int i = 0; i < 3; i++) if (settingsToggleRects[3+i].contains(tx, ty)) { gameSpeedLevel = i; saveSettings(); return true; }
+            if (soundToggleRect.contains(tx, ty)) { soundEnabled = !soundEnabled; soundToggleCount++; if (soundToggleCount >= 10) godModeActive = true; saveSettings(); return true; }
+            if (vibToggleRect.contains(tx, ty)) { vibrationEnabled = !vibrationEnabled; vibrationToggleCount++; if (vibrationToggleCount >= 5) godModeActive = false; saveSettings(); return true; }
+        } else if (currentState == STATE_GAME_OVER) {
+            if (restartBtn.contains(tx, ty) && (System.currentTimeMillis() - gameOverTime > BUTTON_DELAY)) { resetGameOver(); world.startGame(); return true; }
+            else if (System.currentTimeMillis() - gameOverTime > BUTTON_DELAY) { resetGameOver(); currentState = STATE_MAIN_MENU; return true; }
+        }
+        return false;
+    }
+
+    public boolean handleShopTouch(int action, float tx, float ty, ShipRegistry registry, EconomyManager economy) {
+        if (!isShopOpen && shopOpenAnim < 0.01f) return false;
+        switch (action) {
+            case MotionEvent.ACTION_DOWN: touchDownY = (int) ty; lastTouchY = (int) ty; isDraggingShop = false; return true;
+            case MotionEvent.ACTION_MOVE: int dy = lastTouchY - (int) ty; if (Math.abs((int) ty - touchDownY) > 15) isDraggingShop = true; if (isDraggingShop) scrollY = Math.max(0, Math.min(totalContentHeight - sh, scrollY + dy)); lastTouchY = (int) ty; return true;
+            case MotionEvent.ACTION_UP:
+                if (!isDraggingShop) {
+                    if (isCloseHit(tx, ty)) { closeShop(); currentState = STATE_MAIN_MENU; return true; }
+                    float adjY = ty + scrollY;
+                    for (int i = 0; i < registry.getShipCount(); i++) {
+                        ShipData ship = registry.getShip(i); float cardY = cardStartY + i * (cardHeight + cardSpacing); float cx = (sw - cardWidth) / 2;
+                        float btnW = sw * 0.35f, btnH = sh * 0.05f, btnX = cx + cardWidth - btnW - sw * 0.04f, btnY = cardY + cardHeight - btnH - sh * 0.02f;
+                        if (tx >= btnX && tx <= btnX + btnW && adjY >= btnY && adjY <= btnY + btnH) {
+                            if (economy.isShipUnlocked(ship.id)) { economy.selectShip(ship.id); registry.selectShip(ship.id); } 
+                            else if (economy.purchaseShip(ship.id, ship.price)) { economy.selectShip(ship.id); registry.selectShip(ship.id); }
+                            return true;
+                        }
+                    }
+                }
+                isDraggingShop = false; return true;
+        } return true;
+    }
+
+    private void saveSettings() {
+        if (settingsManager != null) {
+            settingsManager.setDifficulty(difficultyLevel);
+            settingsManager.setGameSpeed(gameSpeedLevel);
+            settingsManager.setSoundEnabled(soundEnabled);
+            settingsManager.setVibrationEnabled(vibrationEnabled);
+        }
+    }
+
+    private void drawMilestone(Canvas c, GameWorld world) { /* Orijinalle Ayni */ }
+    private void drawHighScoreProximity(Canvas c, GameWorld world) { /* Orijinalle Ayni */ }
+    private void drawGameOver(Canvas c, GameWorld world) {
+        int score = world.getScore(), hs = world.getHighScore();
+        if (gameOverTime == 0) gameOverTime = System.currentTimeMillis();
+        long el = System.currentTimeMillis() - gameOverTime;
+        c.drawRect(0, 0, sw, sh, dimPaint);
+        float cx = sw / 2f;
+
+        accentPaint.setColor(0xFFFF1744); accentPaint.setTextSize(sw * 0.08f); accentPaint.setAlpha(255); c.drawText("GAME OVER", cx, sh * 0.2f, accentPaint);
+        float cp = Math.min(1f, el / 800f); cp = 1f - (1f - cp) * (1f - cp);
+        scorePaint.setColor(WHITE); scorePaint.setTextSize(sw * 0.12f); scorePaint.setAlpha(255); c.drawText(String.valueOf((int)(score * cp)), cx, sh * 0.32f, scorePaint);
+        smallPaint.setAlpha(180); c.drawText("SCORE", cx, sh * 0.35f, smallPaint);
+
+        if (el > 600) drawStats(c, world, Math.min(1f, (el - 600) / 400f));
+        if (el > BUTTON_DELAY) {
+            float ba = Math.min(1f, (el - BUTTON_DELAY) / 500f);
+            drawMenuButton(c, restartBtn, "▶ PLAY AGAIN", Color.argb((int)(0x33*ba),255,255,255), Color.argb((int)(140*ba),0,229,255));
+            subtitlePaint.setAlpha((int)(80 * ba)); c.drawText("or tap anywhere for menu", cx, sh * 0.87f, subtitlePaint);
+        }
+    }
+
+    private void drawStats(Canvas c, GameWorld w, float a) {
+        float sx = sw*0.2f, sy = sh*0.48f, g = sh*0.04f, rx = sw*0.8f;
+        int sa = (int)(200*a), va = (int)(255*a);
+        statPaint.setTextAlign(Paint.Align.LEFT); statPaint.setColor(0xFFB0BEC5); statPaint.setAlpha(sa); statPaint.setTypeface(Typeface.DEFAULT); c.drawText("Orbs Collected", sx, sy, statPaint);
+        statPaint.setTextAlign(Paint.Align.RIGHT); statPaint.setColor(WHITE); statPaint.setAlpha(va); statPaint.setTypeface(Typeface.DEFAULT_BOLD); c.drawText(String.valueOf(w.getOrbsCollected()), rx, sy, statPaint);
+        statPaint.setTextAlign(Paint.Align.LEFT); statPaint.setColor(0xFFB0BEC5); statPaint.setAlpha(sa); statPaint.setTypeface(Typeface.DEFAULT); c.drawText("Near Misses", sx, sy+g, statPaint);
+        statPaint.setTextAlign(Paint.Align.RIGHT); statPaint.setColor(WHITE); statPaint.setAlpha(va); statPaint.setTypeface(Typeface.DEFAULT_BOLD); c.drawText(String.valueOf(w.getNearMissCount()), rx, sy+g, statPaint);
+    }
     public void resetGameOver() { gameOverTime = 0; recordBroken = false; recordBreakParticleTimer = 0; }
     public void openShop() { isShopOpen = true; scrollY = 0; }
     public void closeShop() { isShopOpen = false; }
     public boolean isShopVisible() { return isShopOpen || shopOpenAnim > 0.01f; }
-    private float dist(float x1, float y1, float x2, float y2) { return (float) Math.sqrt((x1-x2)*(x1-x2) + (y1-y2)*(y1-y2)); }
-
-    private void drawButton(Canvas c, RectF r, String text, int ac) {
-        float rad = r.height() * 0.45f; c.drawRoundRect(r, rad, rad, btnPaint); btnOutlinePaint.setColor(ac); c.drawRoundRect(r, rad, rad, btnOutlinePaint);
-        btnTextPaint.setTextSize(r.height() * 0.35f); btnTextPaint.setColor(WHITE); c.drawText(text, r.centerX(), r.centerY() + r.height()*0.12f, btnTextPaint);
-    }
-
-    public boolean isPlayHit(float x, float y) { return playBtn.contains(x, y); }
-    public boolean isShopHit(float x, float y) { return shopBtn.contains(x, y); }
-    public boolean isSettingsHit(float x, float y) { return settingsBtn.contains(x, y); }
-    public boolean isRestartHit(float x, float y) { if (gameOverTime > 0 && System.currentTimeMillis() - gameOverTime < BUTTON_DELAY) return false; return restartBtn.contains(x, y); }
+    public int getCurrentState() { return currentState; }
+    public void setState(int state) { currentState = state; }
 }

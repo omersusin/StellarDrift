@@ -43,7 +43,6 @@ public class Player {
     private ShipRenderer renderer;
     private float scaleMultiplier; 
     
-    // YENİ: YAKIT SİSTEMİ REFERANSI
     private FuelSystem fuelSystem;
 
     public Player(int sw, int sh, ShipRegistry registry, FuelSystem fuel) {
@@ -89,12 +88,17 @@ public class Player {
     public void update(float dirX, float dirY, float magnitude, float dt) {
         prevX = x;
         
-        // YAKIT CARPANI ILE HIZ HESABI (YAKIT BITINCE YAVASLAR)
         float fuelSpeedMult = (fuelSystem != null) ? fuelSystem.getSpeedMultiplier() : 1.0f;
+        float shipSpeedMult = (currentShip != null) ? currentShip.speedMultiplier : 1.0f;
+        
+        // DÜZELTME: JUGGERNAUT BUG FIX - TABAN HIZ GARANTİSİ
+        // En düşük hız 0.45'ten aşağı düşemez. Gemi asla yerinde saymaz.
+        float rawEffectiveSpeed = Constants.PLAYER_MOVE_SPEED * shipSpeedMult * fuelSpeedMult;
+        float effectiveSpeed = Math.max(Constants.PLAYER_MOVE_SPEED * 0.45f, rawEffectiveSpeed);
         
         if (magnitude > Constants.JOY_DEAD_ZONE) {
             float adjMag = (magnitude - Constants.JOY_DEAD_ZONE) / (1f - Constants.JOY_DEAD_ZONE);
-            float speed = screenW * Constants.PLAYER_MOVE_SPEED * adjMag * (dt * 60f) * currentShip.speedMultiplier * fuelSpeedMult;
+            float speed = screenW * effectiveSpeed * adjMag * (dt * 60f);
             x += dirX * speed; y += dirY * speed;
         } else {
             idleHoverTimer += dt;
@@ -127,8 +131,8 @@ public class Player {
         renderTrail(c); renderGlow(c, cosmicBreath); drawAfterimages(c);
         renderer.drawShip(c, currentShip, x, y, bankAngle, 255, scaleMultiplier, overdrive);
         if (comboCount > 1) drawComboArc(c);
-        if (overdrive) renderOverdrive(c);
-        if (shielded) renderShield(c);
+        if (overdrive) renderOverdrive(c, scaleMultiplier);
+        if (shielded) renderShield(c, scaleMultiplier);
     }
 
     private void drawAfterimages(Canvas c) {
@@ -174,12 +178,12 @@ public class Player {
         }
     }
 
-    private void renderOverdrive(Canvas c) {
+    private void renderOverdrive(Canvas c, float scaleMultiplier) {
         float p = (float)(Math.sin(overdrivePulse) * 0.15 + 0.85); float r = currentShip.collisionRadius * scaleMultiplier * 2.2f * p;
         for (int i = 3; i >= 0; i--) { glowPaint.setColor(0xFFFF6D00); glowPaint.setAlpha(30-i*7); c.drawCircle(x, y, r+i*5, glowPaint); }
     }
 
-    private void renderShield(Canvas c) {
+    private void renderShield(Canvas c, float scaleMultiplier) {
         float p = (float)(Math.sin(shieldPulse) * 0.1 + 0.9); float r = currentShip.collisionRadius * scaleMultiplier * 2.0f * p;
         shieldPaint.setColor(currentShip.cockpitGlowColor);
         for (int i = 3; i >= 0; i--) { shieldPaint.setAlpha(70-i*16); c.drawCircle(x, y, r+i*3, shieldPaint); }

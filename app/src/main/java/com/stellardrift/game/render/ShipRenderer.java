@@ -66,13 +66,45 @@ public class ShipRenderer {
         }
 
         if (ship.detailPaths != null) {
+            boolean isZenith = (ship.id == ShipRegistry.ZENITH);
             boolean isPhantom = (ship.id == ShipRegistry.PHANTOM);
-            int detailColor = isPhantom
-                ? applyAlpha(ship.cockpitGlowColor, (int)(alpha * 0.5f))
-                : applyAlpha(brighten(ship.hullColor, 0.2f), (int)(alpha * 0.3f));
-            detailPaint.setColor(detailColor);
-            detailPaint.setStrokeWidth(isPhantom ? 1.5f : 0.8f);
-            for (Path detail : ship.detailPaths) canvas.drawPath(detail, detailPaint);
+            boolean isSwarm = (ship.id == ShipRegistry.SWARM);
+
+            for (int i = 0; i < ship.detailPaths.length; i++) {
+                Path detail = ship.detailPaths[i];
+                if (detail == null) continue;
+
+                if (isZenith && (i == 2 || i == 3)) {
+                    // Dış kanat katmanlarını doldurarak çiz (FILL)
+                    detailPaint.setStyle(Paint.Style.FILL);
+                    detailPaint.setColor(applyAlpha(brighten(ship.wingColor, 0.12f), (int)(alpha * 0.5f)));
+                    canvas.drawPath(detail, detailPaint);
+
+                    detailPaint.setStyle(Paint.Style.STROKE);
+                    detailPaint.setStrokeWidth(1f);
+                    detailPaint.setColor(applyAlpha(brighten(ship.wingColor, 0.3f), (int)(alpha * 0.3f)));
+                    canvas.drawPath(detail, detailPaint);
+                    continue;
+                }
+
+                detailPaint.setStyle(Paint.Style.STROKE);
+
+                if (isPhantom) {
+                    detailPaint.setStrokeWidth(1.5f);
+                    detailPaint.setColor(applyAlpha(ship.cockpitGlowColor, (int)(alpha * 0.5f)));
+                } else if (isSwarm) {
+                    detailPaint.setStrokeWidth(1f);
+                    detailPaint.setColor(applyAlpha(brighten(ship.hullColor, 0.25f), (int)(alpha * 0.35f)));
+                } else if (isZenith) {
+                    detailPaint.setStrokeWidth(1.2f);
+                    detailPaint.setColor(applyAlpha(ship.cockpitGlowColor, (int)(alpha * 0.4f)));
+                } else {
+                    detailPaint.setStrokeWidth(0.8f);
+                    detailPaint.setColor(applyAlpha(brighten(ship.hullColor, 0.2f), (int)(alpha * 0.3f)));
+                }
+                canvas.drawPath(detail, detailPaint);
+            }
+            detailPaint.setStyle(Paint.Style.STROKE); // Her ihtimale karşı sıfırla
         }
 
         cockpitPaint.setColor(applyAlpha(ship.cockpitColor, alpha));

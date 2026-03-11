@@ -49,7 +49,11 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback {
         if (gameWorld == null) gameWorld = new GameWorld(screenW, screenH, getContext());
         if (renderer == null) renderer = new Renderer();
         if (shipRenderer == null) shipRenderer = new ShipRenderer();
-        if (uiOverlay == null) uiOverlay = new UIOverlay(screenW, screenH);
+        if (uiOverlay == null) {
+            uiOverlay = new UIOverlay(screenW, screenH);
+            uiOverlay.initPrefs(gameWorld.getSettings());
+            uiOverlay.setFuelSystem(gameWorld.getFuelSystem());
+        }
         if (joystick == null) joystick = new Joystick(screenW);
         initVignette();
         startLoop(holder);
@@ -86,7 +90,9 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback {
         switch (event.getAction()) {
             case MotionEvent.ACTION_DOWN:
                 if (state == Constants.STATE_PLAYING) { joystick.onTouchDown(ex, ey); }
-                else if (state == Constants.STATE_SETTINGS) { uiOverlay.handleSettingsTouch(ex, ey, gameWorld); }
+                else if (state == Constants.STATE_SETTINGS) { 
+                    uiOverlay.handleSettingsTouch(ex, ey, gameWorld); 
+                }
                 else { handleTap(ex, ey); }
                 break;
             case MotionEvent.ACTION_MOVE:
@@ -116,7 +122,11 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback {
     public void updateGame() {
         if (uiOverlay != null) uiOverlay.update(0.016f);
         if (background != null && gameWorld != null) background.update(gameWorld.getDifficulty(), gameWorld.getTempoPhase(), 0.016f);
-        if (gameWorld != null) gameWorld.update(joystick.getDirX(), joystick.getDirY(), joystick.getMagnitude());
+        if (gameWorld != null) {
+            // UIOverlay ile GameWorld durumlarını senkronla
+            uiOverlay.setState(gameWorld.getState());
+            gameWorld.update(joystick.getDirX(), joystick.getDirY(), joystick.getMagnitude());
+        }
     }
 
     public void drawGame(Canvas canvas) {
