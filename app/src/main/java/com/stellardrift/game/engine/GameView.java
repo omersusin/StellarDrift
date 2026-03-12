@@ -76,7 +76,7 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback {
         if (shipRenderer == null) shipRenderer = new ShipRenderer();
         if (uiOverlay == null) {
             uiOverlay = new UIOverlay(screenW, screenH);
-            uiOverlay.initPrefs(gameWorld.getSettings(), gameWorld.getShipRegistry());
+            uiOverlay.initPrefs(gameWorld.getSettings(), gameWorld.getShipRegistry(), gameWorld.getEconomy(), shipRenderer, soundManager, vibrationManager);
             uiOverlay.setFuelSystem(gameWorld.getFuelSystem());
         }
         
