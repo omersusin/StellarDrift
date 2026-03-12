@@ -2,10 +2,9 @@ name: Build & Release Stellar Drift
 
 on:
   push:
-    branches: [ main ]
-    tags: [ 'v*' ]
+    branches: [ main, implementations ]
+  tags: [ 'v*' ]
   workflow_dispatch:
-
 jobs:
   build:
     runs-on: ubuntu-latest
