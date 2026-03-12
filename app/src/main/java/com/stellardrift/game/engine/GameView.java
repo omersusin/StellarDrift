@@ -259,8 +259,6 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback {
         drawVignette(canvas);
         drawRiskBorder(canvas);
 
-        int state = gameWorld != null ? gameWorld.getState() : Constants.STATE_MENU;
-
         if (state == Constants.STATE_PLAYING) {
             if (joystick != null) joystick.render(canvas);
             if (gameWorld != null && gameWorld.getPlasmaCore() != null) {

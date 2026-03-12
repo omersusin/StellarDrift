@@ -25,6 +25,7 @@ public class GameWorld {
     private ShipRegistry shipRegistry;
     private EconomyManager economy;
     private ProjectileSystem projectiles;
+    private FuelSystem fuelSystem;
     private SpawnIndicator spawnIndicator;
     private PlasmaCore plasmaCore;
 
