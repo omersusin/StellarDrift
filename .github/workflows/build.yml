@@ -72,29 +72,35 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
-          name: "Stellar Drift ${{ github.ref_name }} — The Shooter Update"
+          name: "Stellar Drift ${{ github.ref_name }} — The Masterpiece Edition"
           body: |
-            ## 🚀 Stellar Drift ${{ github.ref_name }}
+            ## 🚀 Stellar Drift v5.0.0
 
-            **An endless space survival game — made entirely by AI.**
+            **An endless space survival & shooter game — made entirely by AI, using 100% Pure Java & Canvas API.**
             
-            This is the massive **"Shooter Update"**, transforming the game from a simple dodger into a fully-fledged Space Shooter with a functioning economy and unlockable ships!
+            This is the **Ultimate Masterpiece Edition**, the culmination of dozens of updates, bringing meta-progression, programmatic audio, and unparalleled "Game Feel".
 
-            ### 💥 What's New
-            - 🔫 **Auto-Fire Mechanics:** Your ship now automatically fires dual/triple projectiles based on your ship type.
-            - 🛸 **New Unlockable Ships:**
-              - **The Striker** (Default) - Fast & agile interceptor.
-              - **The Juggernaut** - Heavy, armored bomber with slow but devastating dual cannons.
-              - **The Phantom** - Alien technology featuring a triple-burst energy bolt.
-            - 🛒 **In-Game Shop:** Collect Cosmic Credits by destroying asteroids and use them in the beautifully drawn Canvas-UI Shop to unlock new ships!
-            - 🪨 **Destructible Asteroids:** Asteroids now have HP bars! Shoot them down for credits and explosive particle effects.
-            - ⚡ **Muzzle Flashes & Projectile Trails:** High-quality visual feedback added to every shot fired.
+            ### ✨ Major New Features
+            - 🛸 **The Mega Fleet:** 6 fully distinct, vector-drawn ships (Striker, Juggernaut, Phantom, Swarm, Eclipse, Zenith).
+            - 🛒 **In-Game Economy & Upgrades:** Destroy asteroids to earn Cosmic Credits. Use credits in the fully responsive Canvas-drawn Shop to upgrade your ship's Speed, Fire Rate, and Damage!
+            - ⛽ **Fuel & Survival System:** Stardust is now your Fuel. Keep collecting them or your ship will slow down to a crawl. Features a frantic heartbeat vibration when fuel is critical.
+            - 🔫 **Shooter Mechanics:** Dynamic Auto-Fire system. Ships now shoot custom-shaped projectiles with muzzle flashes and trails.
+            - 🔵 **Plasma Core (Nitro):** A rare blue drop that triggers a 4-second **OVERCHARGE**! Doubles your speed, triples your fire rate, and turns your ship into a bullet-hell machine.
 
-            ### 📱 Requirements
-            - Android 5.0+ (API 21)
+            ### 🎬 Extreme "Juice" & Game Feel
+            - **100% Programmatic Audio:** No MP3s. Every laser ("Piyuw"), explosion ("BOOM"), and UI click is generated in real-time using mathematical waveforms (Sine, Square, White Noise).
+            - **Dynamic Ambient Drone:** The background music adapts to the game's Tempo (Calm, Pressure, Reward) with LFO modulation.
+            - **Haptic Feedback:** Custom vibration patterns for every single action in the game.
+            - **Fluid Physics:** The joystick now uses velocity-based physics with acceleration and friction for buttery smooth movement.
+            - **Micro-Animations:** Elastic scaling score pop-ups, Screen Shake, Chromatic Aberration (Glitch) on death, and ship idle hover animations.
+            
+            ### 🛠️ Flawless Engineering
+            - Zero Allocation (No GC Spikes) during gameplay via Object Pooling and Ring Buffers.
+            - Flawless UI scaling across all device sizes.
+            - Perfectly isolated Canvas Paint states.
 
             ### 📦 Install
-            Download **StellarDrift-release.apk** and start blasting asteroids!
+            Download **StellarDrift-release.apk** below and experience the Masterpiece!
           files: |
             app/build/outputs/apk/release/StellarDrift-release.apk
             app/build/outputs/apk/debug/StellarDrift-debug.apk
