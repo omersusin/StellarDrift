@@ -8,7 +8,6 @@ import com.stellardrift.game.util.EconomyManager;
 import com.stellardrift.game.util.SettingsManager;
 import com.stellardrift.game.util.SoundManager;
 import com.stellardrift.game.util.VibrationManager;
-import com.stellardrift.game.render.ShipRenderer;
 
 import java.util.ArrayList;
 import java.util.Iterator;
@@ -38,7 +37,7 @@ public class GameWorld {
     private VibrationManager vibration;
 
     private int combo, comboTimer, nearMissCooldown;
-    private boolean magnetActive, slowmoActive, doubleActive; 
+    private boolean magnetActive, slowmoActive; 
     private int magnetTimer, slowmoTimer, doubleTimer;
     private int powerUpSpawnTimer;
     private float shakeX, shakeY, shakeIntensity;
@@ -61,27 +60,20 @@ public class GameWorld {
     private List<float[]> spawnWarnings;
     private List<float[]> nearMissFlashes;
 
-    private int grazeChainCount;
-    private int grazeChainTimer;
+    private int grazeChainCount, grazeChainTimer;
     private List<float[]> ringBursts; 
 
-    private int chainCounter;
-    private int chainTarget;
-    private boolean chainActive;
-    private boolean firstStarDustSeen, firstNearMiss;
-    private float transitionAlpha;
-    private boolean transitioningIn;
+    private int chainCounter, chainTarget;
+    private boolean chainActive, firstStarDustSeen, firstNearMiss;
     
     private int soundToggleClicks = 0, vibToggleClicks = 0;
     private boolean isGodMode = false;
 
     private float cosmicBreathTimer = 0f, cosmicBreathValue = 0f, hitStallTimer = 0f, spawnBiasAngle = 0f;
-
     private static final int[] MILESTONES = {1000, 2500, 5000, 10000, 25000, 50000};
 
     public void setAudioEngine(SoundManager sm, VibrationManager vm) {
-        this.sound = sm;
-        this.vibration = vm;
+        this.sound = sm; this.vibration = vm;
     }
 
     public GameWorld(int sw, int sh, Context ctx) {
@@ -102,16 +94,17 @@ public class GameWorld {
         powerUps = new ArrayList<>(); popups = new ArrayList<>(); spawnWarnings = new ArrayList<>();
         nearMissFlashes = new ArrayList<>(); ringBursts = new ArrayList<>();
 
-        state = Constants.STATE_MENU; tempoPhase = Constants.TEMPO_CALM; tempoTimer = Constants.TEMPO_CALM_DURATION; transitionAlpha = 0;
+        state = Constants.STATE_MENU; tempoPhase = Constants.TEMPO_CALM; tempoTimer = Constants.TEMPO_CALM_DURATION;
         directionalDangers[0] = 0f; directionalDangers[1] = 0f; directionalDangers[2] = 0f; directionalDangers[3] = 0f;
     }
 
     public void update(float joyDirX, float joyDirY, float joyMag) {
         float dt = 0.016f; 
 
-        updateCosmicBreath(dt); updatePopups(dt); updateShake(); updateShockwave(); updateNearMissFlashes(); updateRingBursts(dt); updateTransition();
+        // SADECE OYUN ESNASINDA VE OYUN BİTTİĞİNDE ARKA PLAN EFEKTLERİNİ ÇALIŞTIR
+        updateCosmicBreath(dt); updatePopups(dt); updateShake(); updateShockwave(); updateNearMissFlashes(); updateRingBursts(dt);
         
-        if (state == Constants.STATE_PAUSED || state != Constants.STATE_PLAYING) return;
+        if (state != Constants.STATE_PLAYING) return;
         if (freezeTimer > 0) { freezeTimer--; if (freezeTimer <= 0) triggerGameOver(); return; }
 
         frameCount++;
@@ -128,14 +121,13 @@ public class GameWorld {
 
         player.setOverchargeSpeedBoost(plasmaCore.getSpeedMultiplier());
         player.update(joyDirX, joyDirY, joyMag, dt);
-        float comboProg = comboTimer > 0 ? (float)comboTimer / Constants.COMBO_TIMEOUT : 0f;
-        player.setComboInfo(combo, comboProg);
+        player.setComboInfo(combo, comboTimer > 0 ? (float)comboTimer / Constants.COMBO_TIMEOUT : 0f);
         updateSpawnBias(dt, joyDirX, joyDirY, joyMag);
         
         ShipData currentShip = shipRegistry.getSelectedShip();
         float overchargeFireMult = plasmaCore.getFireRateMultiplier();
         float recoil = projectiles.autoFire(dt, player.getX(), player.getY(), player.getBankAngle(), currentShip, overchargeFireMult);
-        if (recoil > 0) { shakeIntensity = Math.max(shakeIntensity, recoil * 1.5f); }
+        if (recoil > 0) shakeIntensity = Math.max(shakeIntensity, recoil * 1.5f); 
         
         projectiles.setDamageOverride(currentShip.getEffectiveDamage());
         projectiles.update(dt);
@@ -181,7 +173,7 @@ public class GameWorld {
     private void updateShake() { if (shakeIntensity > 0.3f) { shakeX = (float)(Math.random() * shakeIntensity * 2 - shakeIntensity); shakeY = (float)(Math.random() * shakeIntensity * 2 - shakeIntensity); shakeIntensity *= Constants.SHAKE_DECAY; } else { shakeX = 0; shakeY = 0; shakeIntensity = 0; } }
     private void updateNearMissFlashes() { Iterator<float[]> it = nearMissFlashes.iterator(); while (it.hasNext()) { float[] f = it.next(); f[4]--; if (f[4] <= 0) it.remove(); } }
     private void updateRingBursts(float dt) { Iterator<float[]> it = ringBursts.iterator(); while (it.hasNext()) { float[] b = it.next(); b[0] += b[2] * b[4] * dt; b[1] += b[3] * b[4] * dt; b[4] *= 0.92f; b[5] -= dt * 5f; if (b[5] <= 0) it.remove(); } }
-    private void updateTransition() { if (transitioningIn) { transitionAlpha -= Constants.TRANSITION_SPEED_IN; if (transitionAlpha <= 0) { transitionAlpha = 0; transitioningIn = false; } } }
+    
     private void updateTempo() {
         if (isGodMode) { tempoPhase = Constants.TEMPO_REWARD; return; }
         if (frameCount < Constants.WARMUP_FRAMES) return;
@@ -271,25 +263,13 @@ public class GameWorld {
     private void spawnCollectBurst(float x, float y, int color) { spawnRingBurst(x, y, color); }
     private void collectStarDust(StarDust s) { hitStallTimer = Constants.HIT_STALL_DURATION; combo++; comboTimer = Constants.COMBO_TIMEOUT; if (combo > maxCombo) maxCombo = combo; int pts = Constants.STARDUST_SCORE, cm = 1 + (int)(combo * Constants.COMBO_MULTIPLIER); if (economy.isDoubleActive() || isGodMode) cm *= 2; if (riskWindowActive) pts = (int)(pts * Constants.RISK_WINDOW_MULT); int fp = pts * cm; score += fp; orbsCollected++; float fuelMult = economy.isDoubleActive() ? 2.0f : 1.0f; fuelSystem.onStarDustCollected(fuelMult); if (chainActive) { chainCounter++; if (chainCounter >= chainTarget) { chainActive = false; int chainBonus = Constants.STARDUST_CHAIN_BONUS * chainTarget; score += chainBonus; popups.add(new ScorePopup(s.getX(), s.getY() - 40, "CHAIN +" + chainBonus + "!", 0xFF00E5FF, 1.5f)); spawnParticles(s.getX(), s.getY(), 20, 0xFF00E5FF); fuelSystem.onChainCompleted(); } } popups.add(ScorePopup.createCollect(s.getX(), s.getY(), fp, cm)); spawnRingBurst(s.getX(), s.getY(), 0xFFFFD740); if(sound!=null) sound.playCollect(); if(vibration!=null) vibration.vibrateCollect(); }
     private void collectPowerUp(PowerUp pu) { activatePowerUp(pu.getType()); popups.add(ScorePopup.createPowerUp(pu.getX(), pu.getY(), pu.getType())); spawnRingBurst(pu.getX(), pu.getY(), PowerUp.getColor(pu.getType())); if(sound!=null) sound.playPowerUp(); if(vibration!=null) vibration.vibratePowerUp(); }
-    private void activatePowerUp(int type) { switch (type) { case Constants.POWERUP_MAGNET: magnetActive = true; magnetTimer = Constants.POWERUP_DURATION; break; case Constants.POWERUP_SLOWMO: slowmoActive = true; slowmoTimer = Constants.POWERUP_DURATION; break; case Constants.POWERUP_DOUBLE: economy.setDoubleActive(true); doubleTimer = Constants.POWERUP_DURATION; doubleActive = true; break; case Constants.POWERUP_SHIELD: player.activateShield(Constants.POWERUP_DURATION); break; } }
-    
-    private void onNearMiss(float px, float py, float ax, float ay) { 
-        nearMissCooldown = Constants.NEAR_MISS_COOLDOWN; nearMissCount++; if (!firstNearMiss) firstNearMiss = true; 
-        grazeChainCount++; grazeChainTimer = Constants.GRAZE_CHAIN_WINDOW; 
-        int grazePoints = Constants.NEAR_MISS_BONUS * (1 << (Math.min(grazeChainCount, 6) - 1)); 
-        if (riskWindowActive) grazePoints = (int)(grazePoints * Constants.RISK_WINDOW_MULT); score += grazePoints; 
-        int textColor; switch (grazeChainCount) { case 1: textColor = Color.WHITE; break; case 2: textColor = Color.CYAN; break; case 3: textColor = Color.MAGENTA; break; default: textColor = Color.rgb(255, 100, 0); break; } 
-        if (grazeChainCount >= 3) popups.add(new ScorePopup(px, py - 70, grazeChainCount >= 5 ? "INSANE!" : "DAREDEVIL!", textColor, 1.6f)); 
-        popups.add(new ScorePopup(px, py - 40, "+" + grazePoints, textColor, 1f)); 
-        riskWindowActive = true; riskWindowTimer = Constants.RISK_WINDOW_DURATION; 
-        nearMissFlashes.add(new float[]{px, py, ax, ay, Constants.NEAR_MISS_FLASH_LIFE}); 
-        if(sound!=null) sound.playNearMiss(); 
-        if (grazeChainCount > 1 && vibration!=null) vibration.vibrateNearMiss(); // HATA ÇÖZÜMÜ: vibrateNearMiss kullanılıyor (eski kodda patlama veriliyordu)
-    }
-    
+    private void activatePowerUp(int type) { switch (type) { case Constants.POWERUP_MAGNET: magnetActive = true; magnetTimer = Constants.POWERUP_DURATION; break; case Constants.POWERUP_SLOWMO: slowmoActive = true; slowmoTimer = Constants.POWERUP_DURATION; break; case Constants.POWERUP_DOUBLE: economy.setDoubleActive(true); doubleTimer = Constants.POWERUP_DURATION; break; case Constants.POWERUP_SHIELD: player.activateShield(Constants.POWERUP_DURATION); break; } }
+    private void onNearMiss(float px, float py, float ax, float ay) { nearMissCooldown = Constants.NEAR_MISS_COOLDOWN; nearMissCount++; if (!firstNearMiss) firstNearMiss = true; grazeChainCount++; grazeChainTimer = Constants.GRAZE_CHAIN_WINDOW; int grazePoints = Constants.NEAR_MISS_BONUS * (1 << (Math.min(grazeChainCount, 6) - 1)); if (riskWindowActive) grazePoints = (int)(grazePoints * Constants.RISK_WINDOW_MULT); score += grazePoints; int textColor; switch (grazeChainCount) { case 1: textColor = Color.WHITE; break; case 2: textColor = Color.CYAN; break; case 3: textColor = Color.MAGENTA; break; default: textColor = Color.rgb(255, 100, 0); break; } if (grazeChainCount >= 3) popups.add(new ScorePopup(px, py - 70, grazeChainCount >= 5 ? "INSANE!" : "DAREDEVIL!", textColor, 1.6f)); popups.add(new ScorePopup(px, py - 40, "+" + grazePoints, textColor, 1f)); riskWindowActive = true; riskWindowTimer = Constants.RISK_WINDOW_DURATION; nearMissFlashes.add(new float[]{px, py, ax, ay, Constants.NEAR_MISS_FLASH_LIFE}); if(sound!=null) sound.playNearMiss(); if (grazeChainCount > 1 && vibration!=null) vibration.vibrateNearMiss(); }
     private void checkOverdrive() { if (!overdriveTriggered && combo >= Constants.OVERDRIVE_COMBO_THRESHOLD && !player.isOverdrive()) { overdriveTriggered = true; player.activateOverdrive(); popups.add(new ScorePopup(player.getX(), player.getY() - 60, "OVERDRIVE!", 0xFFFF6D00, 1.8f)); spawnParticles(player.getX(), player.getY(), 20, 0xFFFF6D00); if(vibration!=null) vibration.vibrateExplosion(); } }
     private void onPlayerHit(Asteroid a, float px, float py) { killerAsteroid = a; spawnParticles(px, py, Constants.EXPLOSION_PARTICLES, 0xFFFF1744); spawnParticles(a.getX(), a.getY(), Constants.EXPLOSION_PARTICLES / 2, 0xFF78909C); if(sound!=null) sound.playDeath(); if(vibration!=null) vibration.vibrateDeath(); shakeIntensity = Constants.SHAKE_INTENSITY; shockwaveActive = true; shockwaveX = px; shockwaveY = py; shockwaveRadius = 0; shockwaveAlpha = 1f; freezeTimer = Constants.FREEZE_FRAMES; }
+    
     private void triggerGameOver() { state = Constants.STATE_GAME_OVER; settings.setHighScore(score); settings.incrementGamesPlayed(); economy.convertSessionScore(score); isGodMode = false; soundToggleClicks = 0; vibToggleClicks = 0; }
+    
     private void updateShockwave() { if (!shockwaveActive) return; shockwaveRadius += 25; float maxR = Math.max(screenW, screenH) * 0.8f; shockwaveAlpha = 1f - (shockwaveRadius / maxR); if (shockwaveAlpha <= 0) { shockwaveActive = false; shockwaveAlpha = 0; } }
     private void checkMilestone() { for (int m : MILESTONES) { if (score >= m && lastMilestone < m) { lastMilestone = m; milestoneText = m >= 10000 ? "★ " + (m/1000) + "K ★" : "★ " + m + " ★"; milestoneTimer = 90; spawnParticles(screenW / 2f, screenH * 0.3f, 25, 0xFFFFD740); if(vibration!=null) vibration.vibrateCollect(); break; } } }
     private void updateDangerLevel() { float minDist = Float.MAX_VALUE; float px = player.getX(), py = player.getY(); for (Asteroid a : asteroids) { float dx = px - a.getX(), dy = py - a.getY(), dist = (float) Math.sqrt(dx * dx + dy * dy) - a.getSize(); if (dist < minDist) minDist = dist; } dangerLevel = Math.max(0, Math.min(1f, 1f - minDist / (screenW * 0.2f))); }
@@ -297,32 +277,36 @@ public class GameWorld {
     private int tweakColor(int b) { int r = Math.min(255, Math.max(0, ((b >> 16)&0xFF) + (int)(Math.random()*40-20))), g = Math.min(255, Math.max(0, ((b >> 8)&0xFF) + (int)(Math.random()*40-20))), bl = Math.min(255, Math.max(0, (b&0xFF) + (int)(Math.random()*40-20))); return 0xFF000000 | (r << 16) | (g << 8) | bl; }
     private void cleanOffscreen() { Iterator<Asteroid> ai = asteroids.iterator(); while (ai.hasNext()) if (ai.next().isOffScreen(screenH)) ai.remove(); Iterator<StarDust> si = starDusts.iterator(); while (si.hasNext()) if (si.next().isOffScreen(screenH)) si.remove(); Iterator<PowerUp> pi = powerUps.iterator(); while (pi.hasNext()) if (pi.next().isOffScreen(screenH)) pi.remove(); }
 
-    public void handleTap() { if (state == Constants.STATE_GAME_OVER) { state = Constants.STATE_MENU; if(sound!=null) sound.playMenuClick(); if(vibration!=null) vibration.vibrateMenuClick(); } }
-    
-    // HATA ÇÖZÜMÜ: openSettings eklendi
+    // ===============================================
+    // STATE KONTROLLERİ (Merkezi, Hatasız)
+    // ===============================================
+    public int getState() { return state; } 
+    public void setState(int s) { this.state = s; } 
+
+    public void openShop() { state = Constants.STATE_SHOP; }
+    public void closeShop() { state = Constants.STATE_MENU; }
     public void openSettings() { state = Constants.STATE_SETTINGS; }
-    
+    public void closeSettings() { state = Constants.STATE_MENU; }
+    public void pauseGame() { if (state == Constants.STATE_PLAYING) state = Constants.STATE_PAUSED; }
+    public void resumeGame() { if (state == Constants.STATE_PAUSED) state = Constants.STATE_PLAYING; }
+    public void quitToMenu() { state = Constants.STATE_MENU; }
+
     public void startGame() {
         state = Constants.STATE_PLAYING; score = 0; difficulty = 1f; frameCount = 0; combo = 0; comboTimer = 0; nearMissCooldown = 0;
         magnetActive = false; slowmoActive = false; doubleActive = false; magnetTimer = 0; slowmoTimer = 0; doubleTimer = 0; economy.setDoubleActive(false);
         powerUpSpawnTimer = 0; overdriveTriggered = false; riskWindowActive = false; riskWindowTimer = 0; freezeTimer = 0; killerAsteroid = null; shockwaveActive = false; shakeIntensity = 0; shakeX = 0; shakeY = 0;
         orbsCollected = 0; nearMissCount = 0; maxCombo = 0; lastMilestone = 0; milestoneText = null; milestoneTimer = 0; dangerLevel = 0; tempoPhase = Constants.TEMPO_CALM; tempoTimer = Constants.TEMPO_CALM_DURATION;
-        chainActive = false; chainCounter = 0; chainTarget = 0; firstStarDustSeen = false; firstNearMiss = false; transitionAlpha = 1f; transitioningIn = true; grazeChainCount = 0; grazeChainTimer = 0; hitStallTimer = 0f; spawnBiasAngle = 0f;
+        chainActive = false; chainCounter = 0; chainTarget = 0; firstStarDustSeen = false; firstNearMiss = false; transitioningIn = true; grazeChainCount = 0; grazeChainTimer = 0; hitStallTimer = 0f; spawnBiasAngle = 0f;
         fuelSystem.reset(); startTime = System.currentTimeMillis(); asteroids.clear(); starDusts.clear(); particles.clear(); powerUps.clear(); popups.clear(); spawnWarnings.clear(); nearMissFlashes.clear(); ringBursts.clear(); plasmaCore.reset(); player.reset();
         economy.syncUpgradesToShipData(shipRegistry.getAllShips()); player.setShip(shipRegistry.getSelectedShip()); 
         if (isGodMode) popups.add(new ScorePopup(screenW/2f, screenH/2f, "GOD MODE ENABLED", 0xFFFFD740, 2f));
     }
-    public void pauseGame() { if (state == Constants.STATE_PLAYING) state = Constants.STATE_PAUSED; }
-    public void resumeGame() { if (state == Constants.STATE_PAUSED) state = Constants.STATE_PLAYING; }
-    public void quitToMenu() { state = Constants.STATE_MENU; }
-    public void closeSettings() { state = Constants.STATE_MENU; }
+    
     public void cycleDifficulty() { settings.cycleDifficulty(); if(sound!=null) sound.playMenuClick(); if(vibration!=null) vibration.vibrateMenuClick(); }
     public void cycleGameSpeed() { settings.cycleGameSpeed(); if(sound!=null) sound.playMenuClick(); if(vibration!=null) vibration.vibrateMenuClick(); }
     public void toggleSound() { settings.toggleSound(); if(sound!=null) { sound.setEnabled(settings.isSoundEnabled()); if (settings.isSoundEnabled()) sound.playMenuClick(); } if (!isGodMode) { soundToggleClicks++; if (soundToggleClicks >= 10) { isGodMode = true; if(vibration!=null) vibration.vibrateExplosion(); } } }
     public void toggleVibration() { settings.toggleVibration(); if(vibration!=null) { vibration.setEnabled(settings.isVibrationEnabled()); vibration.vibrateMenuClick(); } if (isGodMode) { vibToggleClicks++; if (vibToggleClicks >= 5) { isGodMode = false; soundToggleClicks = 0; vibToggleClicks = 0; if(sound!=null) sound.playMenuClick(); } } }
 
-    public int getState() { return state; } 
-    public void setState(int state) { this.state = state; } // Extra garanti
     public int getScore() { return score; } public int getHighScore() { return settings.getHighScore(); } public float getDifficulty() { return difficulty; } public Player getPlayer() { return player; } public List<Asteroid> getAsteroids() { return asteroids; } public List<StarDust> getStarDusts() { return starDusts; } public List<Particle> getParticles() { return particles; } public List<PowerUp> getPowerUps() { return powerUps; } public List<ScorePopup> getPopups() { return popups; } public SettingsManager getSettings() { return settings; } public int getCombo() { return combo; } public boolean isMagnetActive() { return magnetActive; } public boolean isSlowmoActive() { return slowmoActive; } public boolean isDoubleActive() { return doubleActive; } public int getMagnetTimer() { return magnetTimer; } public int getSlowmoTimer() { return slowmoTimer; } public int getDoubleTimer() { return doubleTimer; } public float getShakeX() { return shakeX; } public float getShakeY() { return shakeY; } public int getOrbsCollected() { return orbsCollected; } public int getNearMissCount() { return nearMissCount; } public int getMaxCombo() { return maxCombo; } public long getSurvivalTime() { return startTime == 0 ? 0 : (System.currentTimeMillis() - startTime) / 1000; } public int getTempoPhase() { return tempoPhase; } public boolean isRiskWindowActive() { return riskWindowActive; } public int getRiskWindowTimer() { return riskWindowTimer; } public boolean isFreezing() { return freezeTimer > 0; } public Asteroid getKillerAsteroid() { return killerAsteroid; } public boolean isShockwaveActive() { return shockwaveActive; } public float getShockwaveX() { return shockwaveX; } public float getShockwaveY() { return shockwaveY; } public float getShockwaveRadius() { return shockwaveRadius; } public float getShockwaveAlpha() { return shockwaveAlpha; } public float getDangerLevel() { return dangerLevel; } public float[] getDirectionalDangers() { return directionalDangers; } public String getMilestoneText() { return milestoneText; } public int getMilestoneTimer() { return milestoneTimer; } public List<float[]> getSpawnWarnings() { return spawnWarnings; } public List<float[]> getNearMissFlashes() { return nearMissFlashes; } public List<float[]> getRingBursts() { return ringBursts; } public float getTransitionAlpha() { return transitionAlpha; } public boolean isFirstStarDustSeen() { return firstStarDustSeen; } public boolean isFirstNearMiss() { return firstNearMiss; } public int getFrameCount() { return frameCount; } public float getCosmicBreath() { return cosmicBreathValue; } public void releaseResources() { if (sound != null) sound.release(); }
     public ProjectileSystem getProjectiles() { return projectiles; } public ShipRegistry getShipRegistry() { return shipRegistry; } public EconomyManager getEconomy() { return economy; } 
     public FuelSystem getFuelSystem() { return fuelSystem; } public boolean isGodModeActive() { return isGodMode; } public PlasmaCore getPlasmaCore() { return plasmaCore; }
