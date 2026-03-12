@@ -13,7 +13,7 @@ public class SoundManager {
     private short[] shootBuffer, hitBuffer, explodeBuffer, collectBuffer;
     private short[] powerUpBuffer, errorBuffer, overchargeBuffer, comboBuffer;
     private short[] nearMissBuffer, deathBuffer, menuClickBuffer, purchaseBuffer;
-    private short[] fuelLowBuffer, upgradeBuffer;
+    private short[] fuelLowBuffer, upgradeBuffer, gameOverBuffer;
 
     private static final int TRACK_POOL_SIZE = 6;
     private final AudioTrack[] trackPool = new AudioTrack[TRACK_POOL_SIZE];
@@ -37,6 +37,7 @@ public class SoundManager {
         nearMissBuffer = generateNearMissSound(); deathBuffer = generateDeathSound();
         menuClickBuffer = generateMenuClickSound(); purchaseBuffer = generatePurchaseSound();
         fuelLowBuffer = generateFuelLowSound(); upgradeBuffer = generateUpgradeSound();
+        gameOverBuffer = generateGameOverSound();
     }
 
     private short[] generateShootSound() {
@@ -176,8 +177,19 @@ public class SoundManager {
         } return buf;
     }
 
+    private short[] generateGameOverSound() {
+        int samples = (int)(SAMPLE_RATE * 1.5f); short[] buf = new short[samples]; double phase = 0;
+        float[] notes = {329.63f, 261.63f, 220f, 164.81f}; // E4, C4, A3, E3
+        for (int i = 0; i < samples; i++) {
+            float t = (float) i / samples; int nIdx = Math.min((int)(t * notes.length), notes.length - 1);
+            double wave = Math.sin(2 * Math.PI * phase) * 0.5 + (Math.random() * 2 - 1) * 0.05;
+            float locT = (t * notes.length) - nIdx, env = (float) Math.exp(-locT * 3);
+            buf[i] = (short)(wave * 0.4f * env * Short.MAX_VALUE); phase += notes[nIdx] / SAMPLE_RATE;
+        } return buf;
+    }
+
     private void initTrackPool() {
-        int maxLen = deathBuffer.length * 2, bufSize = Math.max(AudioTrack.getMinBufferSize(SAMPLE_RATE, AudioFormat.CHANNEL_OUT_MONO, AudioFormat.ENCODING_PCM_16BIT), maxLen);
+        int maxLen = gameOverBuffer.length * 2, bufSize = Math.max(AudioTrack.getMinBufferSize(SAMPLE_RATE, AudioFormat.CHANNEL_OUT_MONO, AudioFormat.ENCODING_PCM_16BIT), maxLen);
         AudioAttributes attrs = new AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_GAME).setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION).build();
         AudioFormat format = new AudioFormat.Builder().setSampleRate(SAMPLE_RATE).setEncoding(AudioFormat.ENCODING_PCM_16BIT).setChannelMask(AudioFormat.CHANNEL_OUT_MONO).build();
         for (int i = 0; i < TRACK_POOL_SIZE; i++) trackPool[i] = new AudioTrack.Builder().setAudioAttributes(attrs).setAudioFormat(format).setBufferSizeInBytes(bufSize).setTransferMode(AudioTrack.MODE_STATIC).build();
@@ -229,6 +241,7 @@ public class SoundManager {
     public void playOvercharge() { playBuffer(overchargeBuffer, 0.9f); } public void playCombo() { playBuffer(comboBuffer, 0.4f); } public void playNearMiss() { playBuffer(nearMissBuffer, 0.5f); }
     public void playDeath() { playBuffer(deathBuffer, 1.0f); } public void playMenuClick() { playBuffer(menuClickBuffer, 0.4f); } public void playPurchase() { playBuffer(purchaseBuffer, 0.6f); }
     public void playFuelLow() { playBuffer(fuelLowBuffer, 0.6f); } public void playUpgrade() { playBuffer(upgradeBuffer, 0.7f); }
+    public void playGameOver() { playBuffer(gameOverBuffer, 0.8f); }
 
     public void setEnabled(boolean e) { enabled = e; } public boolean isEnabled() { return enabled; }
     public void release() { stopDrone(); for (AudioTrack t : trackPool) { if (t != null) { try { t.stop(); t.release(); } catch (Exception ignored) {} } } }
