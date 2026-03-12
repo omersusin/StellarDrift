@@ -10,8 +10,8 @@ android {
         applicationId "com.stellardrift.game"
         minSdk 21
         targetSdk 34
-        versionCode 9
-        versionName "4.3.0"
+        versionCode 11
+        versionName "4.9.0"
     }
 
     signingConfigs {
