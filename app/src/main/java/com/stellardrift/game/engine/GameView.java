@@ -14,7 +14,11 @@ import android.view.SurfaceView;
 import com.stellardrift.game.util.Constants;
 import com.stellardrift.game.util.SoundManager;
 import com.stellardrift.game.util.VibrationManager;
+import com.stellardrift.game.util.PersonalBestTracker;
+import com.stellardrift.game.util.SessionStats;
 import com.stellardrift.game.world.GameWorld;
+import com.stellardrift.game.world.WaveTracker;
+import com.stellardrift.game.world.SpawnIndicator;
 import com.stellardrift.game.render.SpaceBackground;
 import com.stellardrift.game.render.Renderer;
 import com.stellardrift.game.render.ShipRenderer;
@@ -29,6 +33,10 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback {
     private ShipRenderer shipRenderer;
     private UIOverlay uiOverlay;
     private Joystick joystick;
+    private WaveTracker waveTracker;
+    private SpawnIndicator spawnIndicator;
+    private PersonalBestTracker personalBest;
+    private int lastTempoPhase;
     
     private SoundManager soundManager;
     private VibrationManager vibrationManager;
@@ -76,7 +84,7 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback {
         if (shipRenderer == null) shipRenderer = new ShipRenderer();
         if (uiOverlay == null) {
             uiOverlay = new UIOverlay(screenW, screenH);
-            uiOverlay.initPrefs(gameWorld.getSettings(), gameWorld.getShipRegistry(), gameWorld.getEconomy(), shipRenderer, soundManager, vibrationManager);
+            uiOverlay.initPrefs(gameWorld.getSettings(), gameWorld.getShipRegistry(), gameWorld.getEconomy(), shipRenderer, soundManager, vibrationManager, personalBest);
             uiOverlay.setFuelSystem(gameWorld.getFuelSystem());
         }
         
@@ -87,6 +95,10 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback {
         gameWorld.setAudioEngine(soundManager, vibrationManager);
         
         if (joystick == null) joystick = new Joystick(screenW);
+        if (waveTracker == null) waveTracker = new WaveTracker(screenW, screenH);
+        if (spawnIndicator == null) spawnIndicator = new SpawnIndicator(screenW);
+        if (personalBest == null) personalBest = new PersonalBestTracker(getContext());
+        gameWorld.setSpawnIndicator(spawnIndicator);
         initVignette();
         initPauseUI();
         startLoop(holder);
@@ -172,12 +184,12 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback {
         if (gameWorld == null || uiOverlay == null) return;
         int state = gameWorld.getState();
         if (state == Constants.STATE_MENU) {
-            if (uiOverlay.isPlayHit(x, y)) { uiOverlay.resetGameOver(); gameWorld.startGame(); if(soundManager!=null) soundManager.playMenuClick(); }
+            if (uiOverlay.isPlayHit(x, y)) { uiOverlay.resetGameOver(); if (waveTracker != null) waveTracker.reset(); if (spawnIndicator != null) spawnIndicator.reset(); gameWorld.startGame(); if(soundManager!=null) soundManager.playMenuClick(); }
             else if (uiOverlay.isShopHit(x, y)) { uiOverlay.openShop(); if(soundManager!=null) soundManager.playMenuClick(); }
             else if (uiOverlay.isSettingsHit(x, y)) { gameWorld.openSettings(); if(soundManager!=null) soundManager.playMenuClick(); }
         } else if (state == Constants.STATE_GAME_OVER) {
-            if (uiOverlay.isRestartHit(x, y)) { uiOverlay.resetGameOver(); gameWorld.startGame(); if(soundManager!=null) soundManager.playMenuClick(); }
-            else { gameWorld.handleTap(); uiOverlay.resetGameOver(); }
+            if (uiOverlay.isRestartHit(x, y)) { uiOverlay.resetGameOver(); if (waveTracker != null) waveTracker.reset(); if (spawnIndicator != null) spawnIndicator.reset(); gameWorld.startGame(); if(soundManager!=null) soundManager.playMenuClick(); }
+            else if (uiOverlay.isMenuHit(x, y)) { gameWorld.handleTap(); uiOverlay.resetGameOver(); }
         }
     }
 
@@ -185,8 +197,35 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback {
         if (uiOverlay != null) uiOverlay.update(0.016f);
         if (background != null && gameWorld != null) background.update(gameWorld.getDifficulty(), gameWorld.getTempoPhase(), 0.016f);
         if (gameWorld != null) {
+            int prevState = gameWorld.getState();
             uiOverlay.setState(gameWorld.getState());
             gameWorld.update(joystick.getDirX(), joystick.getDirY(), joystick.getMagnitude());
+            int currentState = gameWorld.getState();
+
+            if (prevState == Constants.STATE_PLAYING && currentState == Constants.STATE_GAME_OVER) {
+                if (waveTracker != null) {
+                    gameWorld.getSessionStats().wave = waveTracker.getCurrentWave();
+                }
+                if (personalBest != null) {
+                    int newRecords = personalBest.evaluateSession(gameWorld.getSessionStats());
+                    if (newRecords > 0) {
+                        if(soundManager!=null) soundManager.playPurchase();
+                        if(vibrationManager!=null) vibrationManager.vibratePurchase();
+                    }
+                }
+            }
+            
+            if (waveTracker != null) {
+                int currentPhase = gameWorld.getTempoPhase();
+                if (currentPhase != lastTempoPhase) {
+                    waveTracker.onPhaseChanged(currentPhase);
+                    lastTempoPhase = currentPhase;
+                }
+                waveTracker.update(0.016f);
+            }
+            if (spawnIndicator != null) {
+                spawnIndicator.update(0.016f);
+            }
         }
     }
 
@@ -199,6 +238,11 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback {
         if (sx != 0 || sy != 0) canvas.translate(sx, sy);
         
         if (background != null) background.render(canvas);
+
+        int state = gameWorld != null ? gameWorld.getState() : Constants.STATE_MENU;
+        if (state == Constants.STATE_PLAYING && spawnIndicator != null) {
+            spawnIndicator.draw(canvas);
+        }
 
         if (gameWorld != null && gameWorld.getPlasmaCore() != null) {
             gameWorld.getPlasmaCore().drawOverchargeScreenEffect(canvas, screenW, screenH);
@@ -232,6 +276,10 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback {
 
         if (uiOverlay != null && gameWorld != null) {
             uiOverlay.renderFull(canvas, gameWorld, shipRenderer);
+        }
+        
+        if (state == Constants.STATE_PLAYING && waveTracker != null) {
+            waveTracker.draw(canvas);
         }
 
         drawTransition(canvas);

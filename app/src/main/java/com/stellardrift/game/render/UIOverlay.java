@@ -14,6 +14,8 @@ import com.stellardrift.game.util.EconomyManager;
 import com.stellardrift.game.util.SettingsManager;
 import com.stellardrift.game.util.SoundManager;
 import com.stellardrift.game.util.VibrationManager;
+import com.stellardrift.game.util.PersonalBestTracker;
+import com.stellardrift.game.util.SessionStats;
 import com.stellardrift.game.world.FuelSystem;
 import com.stellardrift.game.world.GameWorld;
 import com.stellardrift.game.world.PowerUp;
@@ -43,6 +45,7 @@ public class UIOverlay {
     private boolean godModeActive = false;
     private SettingsManager settingsManager;
     private ShopUI shopUI;
+    private PersonalBestTracker personalBest;
 
     private final Paint bgBlackPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint bgOverlayPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -65,10 +68,18 @@ public class UIOverlay {
     private Paint closeBtnCirclePaint, closeBtnXPaint;
     private Paint toggleBgPaint, toggleActivePaint, toggleTextPaint, dividerPaint;
 
+    private final Paint goStatLabelPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final Paint goStatValuePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final Paint goGradePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+
     private RectF playBtn = new RectF(), settingsBtn = new RectF(), shopBtn = new RectF();
     private RectF restartBtn = new RectF(), tempRect = new RectF();
     private RectF[] settingsToggleRects = new RectF[6];
     private RectF soundToggleRect = new RectF(), vibToggleRect = new RectF();
+    private final RectF retryButtonRect = new RectF();
+    private final RectF menuButtonRect = new RectF();
+    private final Paint retryBtnPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final Paint retryTextPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
 
     private float pulse;
     private long gameOverTime;
@@ -130,8 +141,9 @@ public class UIOverlay {
     }
 
     public void setFuelSystem(FuelSystem fs) { this.fuelSystem = fs; }
-    public void initPrefs(SettingsManager settings, ShipRegistry registry, EconomyManager economy, ShipRenderer renderer, final SoundManager sm, final VibrationManager vm) {
+    public void initPrefs(SettingsManager settings, ShipRegistry registry, EconomyManager economy, ShipRenderer renderer, final SoundManager sm, final VibrationManager vm, PersonalBestTracker pb) {
         this.settingsManager = settings;
+        this.personalBest = pb;
         difficultyLevel = settings.getDifficulty(); gameSpeedLevel = settings.getGameSpeed(); soundEnabled = settings.isSoundEnabled(); vibrationEnabled = settings.isVibrationEnabled();
         
         shopUI = new ShopUI(registry, economy, renderer, sw, sh);
@@ -348,20 +360,130 @@ public class UIOverlay {
             else { smallPaint.setAlpha(140); c.drawText("BEST: " + hs, cx, sh * 0.41f, smallPaint); }
         }
 
-        if (el > 600) drawStats(c, world, Math.min(1f, (el - 600) / 400f));
-        if (el > BUTTON_DELAY) {
-            float ba = Math.min(1f, (el - BUTTON_DELAY) / 500f);
-            drawMenuButton(c, "▶ PLAY AGAIN", restartBtn, Color.argb((int)(0x33*ba),255,255,255), Color.argb((int)(140*ba),0,229,255), WHITE);
-            subtitlePaint.setAlpha((int)(80 * ba)); c.drawText("or tap anywhere for menu", cx, sh * 0.87f, subtitlePaint);
+        if (el > 600) drawGameOverStats(c, world.getSessionStats(), Math.min(1f, (el - 600) / 400f));
+        drawGameOverButtons(c, 1f, el);
+    }
+
+    private void drawGameOverStats(Canvas canvas, SessionStats stats, float alpha) {
+        float panelX = sw * 0.08f;
+        float panelW = sw * 0.84f;
+        float startY = sh * 0.44f;
+        float rowH = sh * 0.035f;
+
+        goStatLabelPaint.setTextSize(sw * 0.028f);
+        goStatLabelPaint.setTextAlign(Paint.Align.LEFT);
+        goStatLabelPaint.setColor(Color.argb((int)(140 * alpha), 180, 185, 200));
+        goStatLabelPaint.setStyle(Paint.Style.FILL);
+        goStatLabelPaint.setFakeBoldText(false);
+
+        goStatValuePaint.setTextSize(sw * 0.028f);
+        goStatValuePaint.setTextAlign(Paint.Align.RIGHT);
+        goStatValuePaint.setFakeBoldText(true);
+        goStatValuePaint.setStyle(Paint.Style.FILL);
+
+        float rightX = panelX + panelW;
+        float y = startY;
+
+        // Performans notu (büyük, ortada)
+        goGradePaint.setColor(Color.argb((int)(255 * alpha),
+            Color.red(stats.getGradeColor()),
+            Color.green(stats.getGradeColor()),
+            Color.blue(stats.getGradeColor())));
+        goGradePaint.setTextSize(sw * 0.12f);
+        goGradePaint.setTextAlign(Paint.Align.CENTER);
+        goGradePaint.setFakeBoldText(true);
+        goGradePaint.setStyle(Paint.Style.FILL);
+        canvas.drawText(stats.getGrade(), sw * 0.5f, y - sh * 0.02f, goGradePaint);
+        y += sh * 0.04f;
+
+        // İnce ayırıcı
+        canvas.drawLine(panelX, y, rightX, y, goStatLabelPaint);
+        y += rowH;
+
+        // Stat satırları
+        String[][] rows = {
+            {"Süre",           stats.getSurvivalTimeFormatted()},
+            {"Dalga",          String.valueOf(stats.wave)},
+            {"Skor",           String.valueOf(stats.score)},
+            {"Yıldız Tozu",    String.valueOf(stats.starDustCollected)},
+            {"Asteroit Yok.",   String.valueOf(stats.asteroidsDestroyed)},
+            {"Max Combo",      "x" + stats.maxCombo},
+            {"Sıyırmalar",     String.valueOf(stats.nearMisses)},
+            {"İsabet Oranı",   String.format("%.0f%%", stats.getAccuracy())},
+            {"Kazanılan Kredi", "✦ " + stats.creditsEarned},
+        };
+
+        for (String[] row : rows) {
+            goStatLabelPaint.setColor(Color.argb((int)(130 * alpha), 175, 180, 200));
+            canvas.drawText(row[0], panelX, y, goStatLabelPaint);
+
+            // Bazı satırlar farklı renkte
+            int valColor;
+            if (row[0].equals("Kazanılan Kredi")) {
+                valColor = Color.argb((int)(220 * alpha), 230, 200, 50);
+            } else if (row[0].equals("Max Combo") && stats.maxCombo >= 8) {
+                valColor = Color.argb((int)(220 * alpha), 255, 180, 50);
+            } else {
+                valColor = Color.argb((int)(200 * alpha), 230, 235, 245);
+            }
+
+            goStatValuePaint.setColor(valColor);
+            canvas.drawText(row[1], rightX, y, goStatValuePaint);
+
+            y += rowH;
+        }
+        
+        if (personalBest != null) {
+            personalBest.drawNewRecordBadges(canvas, stats, panelX, panelW, startY, rowH, alpha, sw, sh);
         }
     }
 
-    private void drawStats(Canvas c, GameWorld w, float a) {
-        float sx = sw*0.2f, sy = sh*0.48f, g = sh*0.04f, rx = sw*0.8f; int sa = (int)(200*a), va = (int)(255*a);
-        statPaint.setTextAlign(Paint.Align.LEFT); statPaint.setColor(0xFFB0BEC5); statPaint.setAlpha(sa); statPaint.setTypeface(Typeface.DEFAULT); c.drawText("Orbs Collected", sx, sy, statPaint); statPaint.setTextAlign(Paint.Align.RIGHT); statPaint.setColor(WHITE); statPaint.setAlpha(va); statPaint.setTypeface(Typeface.DEFAULT_BOLD); c.drawText(String.valueOf(w.getOrbsCollected()), rx, sy, statPaint);
-        statPaint.setTextAlign(Paint.Align.LEFT); statPaint.setColor(0xFFB0BEC5); statPaint.setAlpha(sa); statPaint.setTypeface(Typeface.DEFAULT); c.drawText("Near Misses", sx, sy+g, statPaint); statPaint.setTextAlign(Paint.Align.RIGHT); statPaint.setColor(WHITE); statPaint.setAlpha(va); statPaint.setTypeface(Typeface.DEFAULT_BOLD); c.drawText(String.valueOf(w.getNearMissCount()), rx, sy+g, statPaint);
-        statPaint.setTextAlign(Paint.Align.LEFT); statPaint.setColor(0xFFB0BEC5); statPaint.setAlpha(sa); statPaint.setTypeface(Typeface.DEFAULT); c.drawText("Max Combo", sx, sy+g*2, statPaint); statPaint.setTextAlign(Paint.Align.RIGHT); statPaint.setColor(w.getMaxCombo()>=5?GOLD:WHITE); statPaint.setAlpha(va); statPaint.setTypeface(Typeface.DEFAULT_BOLD); c.drawText("x"+w.getMaxCombo(), rx, sy+g*2, statPaint);
-        statPaint.setTextAlign(Paint.Align.LEFT); statPaint.setColor(0xFFB0BEC5); statPaint.setAlpha(sa); statPaint.setTypeface(Typeface.DEFAULT); c.drawText("Survival Time", sx, sy+g*3, statPaint); statPaint.setTextAlign(Paint.Align.RIGHT); statPaint.setColor(WHITE); statPaint.setAlpha(va); statPaint.setTypeface(Typeface.DEFAULT_BOLD); c.drawText(w.getSurvivalTime()+"s", rx, sy+g*3, statPaint);
+    private void drawGameOverButtons(Canvas canvas, float alpha, long el) {
+        if (el < BUTTON_DELAY) return;
+
+        float btnFade = Math.min(1f, (el - BUTTON_DELAY) / 300f);
+        float a = alpha * btnFade;
+
+        float btnW = sw * 0.35f;
+        float btnH = sh * 0.055f;
+        float btnR = btnH * 0.5f;
+        float btnY = sh * 0.82f;
+        float gap = sw * 0.03f;
+
+        // ── RETRY butonu (sol, parlak, vurgulu) ──
+        float retryX = sw * 0.5f - btnW - gap * 0.5f;
+        retryButtonRect.set(retryX, btnY, retryX + btnW, btnY + btnH);
+
+        retryBtnPaint.setColor(Color.argb((int)(200 * a), 50, 160, 80));
+        retryBtnPaint.setStyle(Paint.Style.FILL);
+        canvas.drawRoundRect(retryButtonRect, btnR, btnR, retryBtnPaint);
+
+        retryTextPaint.setColor(Color.argb((int)(255 * a), 255, 255, 255));
+        retryTextPaint.setTextSize(sw * 0.032f);
+        retryTextPaint.setTextAlign(Paint.Align.CENTER);
+        retryTextPaint.setFakeBoldText(true);
+        retryTextPaint.setStyle(Paint.Style.FILL);
+        canvas.drawText("▶ RETRY", retryButtonRect.centerX(),
+            retryButtonRect.centerY() + sw * 0.011f, retryTextPaint);
+
+        // ── MENU butonu (sağ, soluk, ikincil) ──
+        float menuX = sw * 0.5f + gap * 0.5f;
+        menuButtonRect.set(menuX, btnY, menuX + btnW, btnY + btnH);
+
+        retryBtnPaint.setColor(Color.argb((int)(120 * a), 40, 45, 60));
+        canvas.drawRoundRect(menuButtonRect, btnR, btnR, retryBtnPaint);
+
+        // Kenarlık
+        retryBtnPaint.setStyle(Paint.Style.STROKE);
+        retryBtnPaint.setStrokeWidth(sw * 0.003f);
+        retryBtnPaint.setColor(Color.argb((int)(60 * a), 120, 130, 160));
+        canvas.drawRoundRect(menuButtonRect, btnR, btnR, retryBtnPaint);
+        retryBtnPaint.setStyle(Paint.Style.FILL);
+
+        retryTextPaint.setColor(Color.argb((int)(180 * a), 180, 185, 200));
+        retryTextPaint.setTextSize(sw * 0.028f);
+        canvas.drawText("MENU", menuButtonRect.centerX(),
+            menuButtonRect.centerY() + sw * 0.01f, retryTextPaint);
     }
 
     private void drawInGameCredits(Canvas c, EconomyManager economy) {
@@ -394,7 +516,8 @@ public class UIOverlay {
     public boolean isPlayHit(float x, float y) { return playBtn.contains(x, y); }
     public boolean isShopHit(float x, float y) { return shopBtn.contains(x, y); }
     public boolean isSettingsHit(float x, float y) { return settingsBtn.contains(x, y); }
-    public boolean isRestartHit(float x, float y) { if (gameOverTime > 0 && System.currentTimeMillis() - gameOverTime < BUTTON_DELAY) return false; return restartBtn.contains(x, y); }
+    public boolean isRestartHit(float x, float y) { if (gameOverTime > 0 && System.currentTimeMillis() - gameOverTime < BUTTON_DELAY) return false; return retryButtonRect.contains(x, y); }
+    public boolean isMenuHit(float x, float y) { if (gameOverTime > 0 && System.currentTimeMillis() - gameOverTime < BUTTON_DELAY) return false; return menuButtonRect.contains(x, y); }
     public boolean isCloseHit(float tx, float ty) { float cx = sw - sw * 0.1f, cy = sh * 0.08f; return (Math.pow(tx - cx, 2) + Math.pow(ty - cy, 2)) < Math.pow(CLOSE_BTN_HITBOX, 2); }
 
     public boolean isSoundEnabled() { return soundEnabled; }

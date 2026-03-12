@@ -43,6 +43,7 @@ public class ProjectileSystem {
     
     // EKSIK OLAN FIELD VE METHOD BURADA
     private int damageOverride = -1;
+    public int totalShotsFired = 0;
 
     public void setDamageOverride(int damage) {
         this.damageOverride = damage;
@@ -108,6 +109,7 @@ public class ProjectileSystem {
 
                 Projectile p = pool[cursor]; cursor = (cursor + 1) % POOL_SIZE;
                 p.init(worldX, worldY, spreadX, baseSpeed, effectiveDamage, ship.projectileColor, pw, ph, ship.id);
+                totalShotsFired++;
 
                 flashX[flashCursor] = worldX; flashY[flashCursor] = worldY; flashLife[flashCursor] = 1f; 
                 flashColor[flashCursor] = (fireRateMultiplier > 1.5f) ? Color.rgb(60, 180, 255) : ship.projectileColor; 
@@ -177,6 +179,13 @@ public class ProjectileSystem {
             canvas.drawCircle(flashX[i], flashY[i], radius * 2, flashPaint);
             flashPaint.setColor(Color.argb((int)(200 * life), 255, 255, 255)); canvas.drawCircle(flashX[i], flashY[i], radius * 0.6f, flashPaint);
         }
+    }
+
+    public void reset() {
+        totalShotsFired = 0;
+        fireTimer = 0f;
+        for (int i = 0; i < POOL_SIZE; i++) pool[i].active = false;
+        for (int i = 0; i < MAX_FLASHES; i++) flashLife[i] = 0;
     }
 
     public interface HitCallback { void onAsteroidHit(Asteroid asteroid); void onAsteroidDestroyed(Asteroid asteroid); }

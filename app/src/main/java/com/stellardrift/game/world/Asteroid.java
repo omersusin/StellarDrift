@@ -111,6 +111,56 @@ public class Asteroid {
         flashOverlayPaint = new Paint(Paint.ANTI_ALIAS_FLAG); flashOverlayPaint.setStyle(Paint.Style.FILL);
     }
 
+    public Asteroid(int sw, int sh, float x, float radius) {
+        this.x = x;
+        this.radius = radius;
+        this.baseX = x;
+        this.y = -radius * 2;
+
+        float sRange = Constants.ASTEROID_MAX_SPEED - Constants.ASTEROID_MIN_SPEED;
+        float speed = (Constants.ASTEROID_MIN_SPEED + (float)(Math.random() * sRange)) * (sw / 1080f);
+        
+        velX = 0;
+        velY = speed;
+
+        rotation = 0; rotSpeed = (float)(Math.random() * 2.5 - 1.25);
+        colorIdx = (int)(Math.random() * COLORS.length);
+
+        age = 0; masterAlpha = 0;
+        hasSine = Math.random() < Constants.ASTEROID_SINE_CHANCE;
+        sinePhase = (float)(Math.random() * Math.PI * 2);
+        sineAmp = sw * Constants.ASTEROID_SINE_AMP * (0.5f + (float)(Math.random() * 0.5));
+        sineFreq = Constants.ASTEROID_SINE_FREQ * (0.7f + (float)(Math.random() * 0.6));
+
+        this.maxHP = Math.max(1, (int)(radius * 0.05f)); 
+        this.currentHP = maxHP;
+
+        this.creditValue = Math.max(3, (int)(radius * 0.15f)); 
+
+        float sizeRatio = Math.min(radius / (sw * 0.08f), 1f); 
+        int gray = (int)(145 - sizeRatio * 50);
+        baseColor = Color.rgb(gray + 10, gray, gray - 5);
+
+        buildPolygon();
+
+        int nc = 2 + (int)(Math.random() * 3);
+        craters = new float[nc][3];
+        for (int i = 0; i < nc; i++) {
+            craters[i][0] = (float)(Math.random() * radius * 0.6 - radius * 0.3);
+            craters[i][1] = (float)(Math.random() * radius * 0.6 - radius * 0.3);
+            craters[i][2] = radius * (0.08f + (float)(Math.random() * 0.15));
+        }
+
+        active = true;
+        boundsRect = new RectF();
+        bodyPaint = new Paint(Paint.ANTI_ALIAS_FLAG); bodyPaint.setStyle(Paint.Style.FILL);
+        edgePaint = new Paint(Paint.ANTI_ALIAS_FLAG); edgePaint.setStyle(Paint.Style.STROKE); edgePaint.setStrokeWidth(1.5f); edgePaint.setColor(0xFF78909C);
+        craterPaint = new Paint(Paint.ANTI_ALIAS_FLAG); craterPaint.setStyle(Paint.Style.FILL);
+        glowPaint = new Paint(Paint.ANTI_ALIAS_FLAG); glowPaint.setStyle(Paint.Style.FILL); glowPaint.setColor(0xFFFF1744);
+        highlightPaint = new Paint(Paint.ANTI_ALIAS_FLAG); highlightPaint.setStyle(Paint.Style.FILL); highlightPaint.setColor(0xFF90A4AE);
+        flashOverlayPaint = new Paint(Paint.ANTI_ALIAS_FLAG); flashOverlayPaint.setStyle(Paint.Style.FILL);
+    }
+
     private void buildPolygon() {
         int verts = 7 + (int)(Math.random() * 4); 
         vertexCount = verts;

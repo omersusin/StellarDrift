@@ -101,7 +101,6 @@ public class Renderer {
     }
 
     private void drawMainScene(Canvas canvas, GameWorld world) {
-        renderSpawnWarnings(canvas, world);
         for (Asteroid a : world.getAsteroids()) a.render(canvas);
         
         if (world.isFreezing() && world.getKillerAsteroid() != null) {
